@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FloraMap</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <div class="app">
+    <div class="toolbar">
+      <a href="/" class="toolbar__voltar">&larr; Projetos</a>
+      <span id="nome-projeto" class="toolbar__nome-projeto">Carregando...</span>
+
+      <label for="input-imagem" style="margin: 0;">
+        <button type="button" onclick="document.getElementById('input-imagem').click()">Enviar imagem</button>
+      </label>
+      <input type="file" id="input-imagem" accept=".png,.jpg,.jpeg" hidden />
+
+      <button type="button" id="botao-detectar" disabled>Detectar estufas</button>
+      <button type="button" id="botao-desenhar" disabled>Desenhar estufa</button>
+      <button type="button" id="botao-variedades">Variedades</button>
+      <button type="button" id="botao-visao-geral">Visão Geral</button>
+    </div>
+
+    <div class="corpo">
+      <div class="mapa">
+        <div id="mapa-vazio" class="mapa__vazio">
+          <p>Nenhuma imagem enviada ainda.</p>
+          <p>Envie uma imagem aérea para começar.</p>
+        </div>
+        <div id="mapa-palco" class="mapa__palco">
+          <img id="mapa-imagem" class="mapa__imagem" alt="Imagem aérea do projeto" />
+          <svg id="mapa-svg" class="mapa__svg"></svg>
+        </div>
+        <div id="banner-amostra" class="banner-amostra" hidden>
+          <span id="texto-banner-amostra"></span>
+          <button type="button" id="botao-concluir-amostra" disabled>Concluir</button>
+          <button type="button" id="botao-cancelar-amostra">Cancelar</button>
+        </div>
+      </div>
+
+      <aside class="sidebar">
+        <div id="sidebar-conteudo"></div>
+      </aside>
+    </div>
+  </div>
+
+  <div id="modal-variedades" class="modal-overlay" hidden>
+    <div class="modal">
+      <div class="modal__cabecalho">
+        <h2 class="modal__titulo">Variedades</h2>
+        <button type="button" id="botao-fechar-variedades" class="modal__fechar" aria-label="Fechar">&times;</button>
+      </div>
+
+      <ul id="lista-variedades" class="lista-variedades"></ul>
+
+      <form id="form-nova-variedade" class="form-nova-variedade">
+        <div style="flex: 1;">
+          <label for="input-nome-variedade">Nome</label>
+          <input type="text" id="input-nome-variedade" placeholder="Ex.: Rosa" />
+        </div>
+        <div>
+          <label for="input-cor-variedade">Cor</label>
+          <input type="color" id="input-cor-variedade" value="#2f6f4e" />
+        </div>
+        <button type="submit" class="primario">Adicionar</button>
+      </form>
+      <p id="erro-variedade" style="color: var(--cor-perigo); font-size: 12px; margin-top: 6px;"></p>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/mapa.js"></script>
+  <script src="/js/sidebar.js"></script>
+  <script src="/js/variedades.js"></script>
+  <script src="/js/undo.js"></script>
+  <script src="/js/projeto.js"></script>
+</body>
+</html>

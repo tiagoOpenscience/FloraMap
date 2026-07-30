@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FloraMap</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <main class="pagina-home">
+    <div class="pagina-home__cabecalho">
+      <h1 class="pagina-home__titulo">FloraMap</h1>
+    </div>
+    <p class="pagina-home__subtitulo">Gerenciamento das estufas da Cooperflora.</p>
+
+    <form id="form-novo-projeto" class="sidebar__acao" style="margin-bottom: 24px;">
+      <div style="flex: 1;">
+        <label for="input-nome-projeto">Novo projeto</label>
+        <input type="text" id="input-nome-projeto" placeholder="Ex.: Fazenda Sede" />
+      </div>
+      <button type="submit" class="primario">Criar</button>
+    </form>
+    <p id="erro-novo-projeto" style="color: var(--cor-perigo); font-size: 12px; margin-top: -16px;"></p>
+
+    <ul id="lista-projetos" class="lista-projetos"></ul>
+  </main>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/home.js"></script>
+</body>
+</html>
