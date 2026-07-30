@@ -258,8 +258,16 @@ def _gerar_imagem_mapa(
                 cor = cor_neutra
             draw_overlay.polygon(pontos_area, fill=cor, outline=(255, 255, 255, 255), width=espessura_area)
 
-    composta = Image.alpha_composite(base, overlay).convert("RGB")
-    draw_final = ImageDraw.Draw(composta)
+    composta_rgba = Image.alpha_composite(base, overlay)
+
+    # Os rótulos são desenhados numa camada RGBA própria, e só depois
+    # compostos com alpha_composite — se fossem desenhados direto sobre
+    # a imagem já convertida para RGB, o canal alfa do fundo translúcido
+    # (usado para o texto continuar legível sobre qualquer cor da foto)
+    # seria ignorado pelo Pillow e viraria um branco sólido opaco atrás
+    # das letras.
+    overlay_texto = Image.new("RGBA", base.size, (0, 0, 0, 0))
+    draw_texto = ImageDraw.Draw(overlay_texto)
 
     fonte_estufa = _fonte(max(14, 16 * escala))
     fonte_area = _fonte(max(10, 11 * escala))
@@ -267,7 +275,7 @@ def _gerar_imagem_mapa(
     for estufa in estufas:
         centro_estufa = _centro(estufa["poligono"])
         _desenhar_texto_com_fundo(
-            draw_final, centro_estufa, [f"{estufa['numero']} · {estufa['nome']}"], fonte_estufa
+            draw_texto, centro_estufa, [f"{estufa['numero']} · {estufa['nome']}"], fonte_estufa
         )
 
         for area in estufa.get("areas") or []:
@@ -277,7 +285,9 @@ def _gerar_imagem_mapa(
                 f"{area.get('canteiros') or '-'}x{area.get('vaos') or '-'}x{area.get('postinhos') or '-'}",
                 area.get("variedade_nome") or "Sem variedade",
             ]
-            _desenhar_texto_com_fundo(draw_final, centro_area, linhas, fonte_area)
+            _desenhar_texto_com_fundo(draw_texto, centro_area, linhas, fonte_area)
+
+    composta = Image.alpha_composite(composta_rgba, overlay_texto).convert("RGB")
 
     if composta.width > LARGURA_MAXIMA_IMAGEM_PDF:
         proporcao = LARGURA_MAXIMA_IMAGEM_PDF / composta.width

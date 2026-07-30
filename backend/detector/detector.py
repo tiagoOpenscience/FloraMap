@@ -48,13 +48,27 @@ RAIO_AMOSTRA_PX = 12  # vizinhança ao redor de cada ponto clicado usada para
 # faixa de cor tão estreita que nem a própria estufa amostrada bata
 # inteira nela.
 MARGEM_MINIMA_H = 10
-MARGEM_MINIMA_S = 30
-MARGEM_MINIMA_V = 35
-MULTIPLICADOR_DESVIO = 3.0
+MARGEM_MINIMA_S = 25
+MARGEM_MINIMA_V = 30
+MULTIPLICADOR_DESVIO = 2.2
 
 # Heurístico genérico (sem amostra): área clara e pouco saturada.
 BRILHO_MINIMO_GENERICO = 140
 SATURACAO_MAXIMA_GENERICA = 70
+
+# Solidez mínima (área do contorno / área do seu fecho convexo) para um
+# contorno ser aceito como estufa. Estufas são estruturas retangulares e
+# convexas; árvores e manchas de vegetação são tipicamente irregulares e
+# lobuladas, com fecho convexo bem maior que a área real — esse filtro
+# descarta esse tipo de falso positivo tanto na detecção automática
+# quanto na semiautomática.
+SOLIDEZ_MINIMA = 0.75
+
+# Quando a área de um contorno aceito ultrapassa este múltiplo da área de
+# referência (amostras, ou mediana dos próprios contornos sem amostra),
+# ele é candidato a ser duas ou mais estufas coladas pela morfologia —
+# tentamos separá-lo via watershed antes de aceitá-lo como está.
+MULTIPLICADOR_AREA_SUSPEITA = 1.6
 
 PontoAmostra = tuple[float, float]
 
@@ -102,9 +116,17 @@ def detectar_estufas(
             hsv, (0, 0, BRILHO_MINIMO_GENERICO), (180, SATURACAO_MAXIMA_GENERICA, 255)
         )
 
-    kernel = np.ones((7, 7), np.uint8)
-    mascara = cv2.morphologyEx(mascara, cv2.MORPH_OPEN, kernel, iterations=1)
-    mascara = cv2.morphologyEx(mascara, cv2.MORPH_CLOSE, kernel, iterations=3)
+    # A abertura usa um kernel um pouco maior para de fato *quebrar*
+    # pontes finas entre estufas vizinhas que a máscara de cor colou
+    # (ex.: uma faixa estreita de grama/sombra parecida em brilho). O
+    # fechamento é bem mais conservador — só fecha ruído/buracos
+    # pequenos dentro de uma mesma estufa, sem voltar a "colar" duas
+    # estruturas separadas (um kernel 7×7 com 3 iterações, usado antes,
+    # preenchia vãos de até ~21px entre estufas próximas).
+    kernel_abertura = np.ones((5, 5), np.uint8)
+    kernel_fechamento = np.ones((3, 3), np.uint8)
+    mascara = cv2.morphologyEx(mascara, cv2.MORPH_OPEN, kernel_abertura, iterations=2)
+    mascara = cv2.morphologyEx(mascara, cv2.MORPH_CLOSE, kernel_fechamento, iterations=1)
 
     contornos, _ = cv2.findContours(
         mascara, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
@@ -118,6 +140,7 @@ def detectar_estufas(
     # imagem inteira, e resolve de forma natural o caso de uma
     # construção pequena (galpão, casa) ter uma cor parecida com a da
     # estufa, mas um tamanho muito menor.
+    area_ref: float | None = None
     if pontos_amostra:
         referencia = _referencia_das_amostras(contornos, pontos_amostra)
         if referencia is not None:
@@ -127,27 +150,137 @@ def detectar_estufas(
             largura_maxima = min(largura_ref * 5, largura * 0.9)
             altura_maxima = min(altura_ref * 5, altura * 0.9)
 
+    candidatos = [
+        c
+        for c in contornos
+        if _contorno_valido(c, area_minima, area_maxima, largura_maxima, altura_maxima)
+    ]
+
+    # Sem amostra, usamos a mediana dos próprios contornos aceitos como
+    # referência de tamanho "típico" — mesma ideia de detectar um blob
+    # anormalmente grande (provável fusão de duas estufas vizinhas).
+    if area_ref is None and candidatos:
+        area_ref = statistics.median(cv2.contourArea(c) for c in candidatos)
+
     poligonos: list[list[dict[str, float]]] = []
-    for contorno in contornos:
+    for contorno in candidatos:
         area = cv2.contourArea(contorno)
-        if area < area_minima or area > area_maxima:
-            continue
+        partes = [contorno]
 
-        _, _, largura_contorno, altura_contorno = cv2.boundingRect(contorno)
-        if largura_contorno > largura_maxima or altura_contorno > altura_maxima:
-            continue
+        if area_ref and area > area_ref * MULTIPLICADOR_AREA_SUSPEITA:
+            separados = _separar_por_watershed(mascara, contorno, area_ref)
+            if separados:
+                partes = separados
 
-        perimetro = cv2.arcLength(contorno, True)
-        aproximado = cv2.approxPolyDP(contorno, EPSILON_RELATIVO * perimetro, True)
-
-        if len(aproximado) < 3:
-            continue
-
-        pontos = [{"x": float(p[0][0]), "y": float(p[0][1])} for p in aproximado]
-        poligonos.append(pontos)
+        for parte in partes:
+            if not _contorno_valido(
+                parte, area_minima, area_maxima, largura_maxima, altura_maxima
+            ):
+                continue
+            poligono = _aproximar_poligono(parte)
+            if poligono is not None:
+                poligonos.append(poligono)
 
     poligonos.sort(key=_chave_ordenacao_espacial)
     return poligonos
+
+
+def _contorno_valido(
+    contorno: np.ndarray,
+    area_minima: float,
+    area_maxima: float,
+    largura_maxima: float,
+    altura_maxima: float,
+) -> bool:
+    """Verifica área, dimensões e solidez (forma) de um contorno.
+
+    A solidez (área do contorno / área do seu fecho convexo) é o que
+    descarta manchas irregulares de vegetação: uma estufa é retangular
+    e praticamente convexa, enquanto copas de árvores e vegetação têm
+    contornos lobulados, com fecho convexo bem maior que a área real.
+    """
+    area = cv2.contourArea(contorno)
+    if area < area_minima or area > area_maxima:
+        return False
+
+    _, _, largura_contorno, altura_contorno = cv2.boundingRect(contorno)
+    if largura_contorno > largura_maxima or altura_contorno > altura_maxima:
+        return False
+
+    area_fecho = cv2.contourArea(cv2.convexHull(contorno))
+    if area_fecho <= 0 or (area / area_fecho) < SOLIDEZ_MINIMA:
+        return False
+
+    return True
+
+
+def _aproximar_poligono(contorno: np.ndarray) -> list[dict[str, float]] | None:
+    perimetro = cv2.arcLength(contorno, True)
+    aproximado = cv2.approxPolyDP(contorno, EPSILON_RELATIVO * perimetro, True)
+    if len(aproximado) < 3:
+        return None
+    return [{"x": float(p[0][0]), "y": float(p[0][1])} for p in aproximado]
+
+
+def _separar_por_watershed(
+    mascara: np.ndarray, contorno: np.ndarray, area_ref: float
+) -> list[np.ndarray] | None:
+    """Tenta separar um contorno anormalmente grande em vários sub-contornos.
+
+    Um contorno bem maior que a referência de tamanho esperada costuma
+    ser duas (ou mais) estufas vizinhas que a máscara de cor + morfologia
+    colaram numa única forma. Em vez de simplesmente descartar esse blob
+    fundido, usamos a transformada de distância para achar um "núcleo"
+    por estufa dentro dele e watershed para dividir a região ambígua
+    entre esses núcleos — devolvendo N contornos separados.
+
+    Retorna None quando só existe um núcleo (nada a separar).
+    """
+    x, y, w, h = cv2.boundingRect(contorno)
+    margem = 2
+    x0, y0 = max(0, x - margem), max(0, y - margem)
+    x1 = min(mascara.shape[1], x + w + margem)
+    y1 = min(mascara.shape[0], y + h + margem)
+
+    mascara_local = np.zeros((y1 - y0, x1 - x0), dtype=np.uint8)
+    cv2.drawContours(
+        mascara_local, [contorno - (x0, y0)], -1, 255, thickness=cv2.FILLED
+    )
+
+    distancia = cv2.distanceTransform(mascara_local, cv2.DIST_L2, 5)
+    if distancia.max() <= 0:
+        return None
+
+    _, nucleos = cv2.threshold(
+        distancia, 0.5 * distancia.max(), 255, cv2.THRESH_BINARY
+    )
+    nucleos = nucleos.astype(np.uint8)
+
+    n_marcadores, marcadores = cv2.connectedComponents(nucleos)
+    n_nucleos = n_marcadores - 1
+    if n_nucleos < 2:
+        return None
+
+    marcadores = marcadores + 1  # núcleos: 2..n_nucleos+1; resto vira "fundo" (1)
+    desconhecido = cv2.subtract(mascara_local, nucleos)
+    marcadores[desconhecido == 255] = 0  # zona ambígua, watershed decide
+    marcadores[mascara_local == 0] = 1  # fora do blob = fundo certo
+
+    imagem_vazia = np.zeros((*mascara_local.shape, 3), dtype=np.uint8)
+    cv2.watershed(imagem_vazia, marcadores)
+
+    partes = []
+    for rotulo in range(2, n_marcadores + 1):
+        sub_mascara = np.uint8(marcadores == rotulo) * 255
+        sub_contornos, _ = cv2.findContours(
+            sub_mascara, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+        )
+        if not sub_contornos:
+            continue
+        maior = max(sub_contornos, key=cv2.contourArea)
+        partes.append(maior + (x0, y0))
+
+    return partes if len(partes) > 1 else None
 
 
 def _referencia_das_amostras(

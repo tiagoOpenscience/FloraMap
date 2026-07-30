@@ -299,13 +299,15 @@ Implementado em `backend/detector/detector.py`. Ver `CLAUDE.md` para o racional 
 ## 7.1 Algoritmo
 
 1. Ler a imagem, suavizar (`GaussianBlur`), converter para HSV.
-2. **Com amostra(s):** para cada ponto `(x,y)` clicado, calcular média e desvio padrão de HSV numa vizinhança (`RAIO_AMOSTRA_PX = 12`); construir uma máscara `inRange` por ponto com margem `max(mínimo, desvio × 3)`; a máscara final é a **união** (OR) de todas — importante para coberturas listradas, onde um único ponto não cobre toda a variação de cor.
+2. **Com amostra(s):** para cada ponto `(x,y)` clicado, calcular média e desvio padrão de HSV numa vizinhança (`RAIO_AMOSTRA_PX = 12`); construir uma máscara `inRange` por ponto com margem `max(mínimo, desvio × 2.2)`; a máscara final é a **união** (OR) de todas — importante para coberturas listradas, onde um único ponto não cobre toda a variação de cor.
    **Sem amostra:** heurístico genérico (`inRange` por brilho alto/saturação baixa), baixa confiança, mantido só por compatibilidade.
-3. Abertura + fechamento morfológico (kernel 7×7) para remover ruído e fechar falhas.
+3. Morfologia assimétrica: abertura com kernel 5×5 (2 iterações) para *quebrar* pontes finas entre estufas vizinhas que a máscara de cor tenha colado; fechamento bem mais conservador, kernel 3×3 (1 iteração), só para fechar ruído/buracos pequenos — sem voltar a colar estruturas separadas (a versão anterior, com fechamento 7×7×3, chegava a preencher vãos de até ~21px entre estufas próximas).
 4. `findContours` (RETR_EXTERNAL).
-5. **Calibração de escala:** localizar, para cada ponto amostrado, o contorno que o contém; usar a **mediana** de área/largura/altura desses contornos como referência. Aceitar só contornos com área entre 15% e 800% da referência, e largura/altura até 5× a referência (com um teto absoluto de 90% da imagem, e sem amostra usa-se um percentual fixo da imagem como fallback).
-6. `approxPolyDP` (epsilon 2% do perímetro) para reduzir a pontos de polígono.
-7. Ordenar espacialmente (linha top→bottom em faixas de 100px, depois esquerda→direita) e numerar sequencialmente.
+5. **Calibração de escala:** localizar, para cada ponto amostrado, o contorno que o contém; usar a **mediana** de área/largura/altura desses contornos como referência. Aceitar só contornos com área entre 15% e 800% da referência, e largura/altura até 5× a referência (com um teto absoluto de 90% da imagem). Sem amostra, a referência de área é a mediana dos próprios contornos já aceitos pelos filtros abaixo (e os limites de área/dimensão usam o percentual fixo da imagem como fallback).
+6. **Filtro de forma (solidez):** para cada contorno candidato, calcular `solidez = área / área do fecho convexo (convex hull)` e rejeitar contornos com solidez abaixo de `SOLIDEZ_MINIMA = 0.75`. Estufas são estruturas retangulares/convexas; árvores e manchas de vegetação são tipicamente irregulares e lobuladas — esse filtro é o que impede a detecção automática (sem amostra) de marcar árvores como estufa, e também descarta um vazamento parcial da máscara para a vegetação ao lado de uma estufa real.
+7. **Separação de blobs fundidos (watershed):** quando um contorno aceito tem área bem maior que a referência (`> 1.6×`), é candidato a ser duas ou mais estufas coladas pela máscara/morfologia. Nesse caso: recorta a máscara local do contorno, calcula a transformada de distância (`distanceTransform`) para achar um "núcleo" por estufa dentro do blob, e — se houver mais de um núcleo — roda `watershed` para dividir a região ambígua entre eles, gerando N sub-contornos separados (cada um passa de novo pelos filtros de área/dimensão/solidez).
+8. `approxPolyDP` (epsilon 2% do perímetro) para reduzir a pontos de polígono.
+9. Ordenar espacialmente (linha top→bottom em faixas de 100px, depois esquerda→direita) e numerar sequencialmente.
 
 ## 7.2 Divisão de Polígono (Área e Split de Estufa)
 

@@ -497,6 +497,8 @@ label:first-child {
   box-shadow: var(--sombra-suave);
   z-index: 10;
   font-size: 13px;
+  cursor: move;
+  user-select: none;
 }
 
 .banner-amostra[hidden] {
@@ -508,6 +510,7 @@ label:first-child {
   border-color: rgba(255, 255, 255, 0.4);
   color: #fff;
   flex-shrink: 0;
+  cursor: pointer;
 }
 
 .banner-amostra button:hover {

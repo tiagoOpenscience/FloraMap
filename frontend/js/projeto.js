@@ -16,6 +16,49 @@ document.addEventListener("DOMContentLoaded", async () => {
   const botaoConcluirAmostra = document.getElementById("botao-concluir-amostra");
   const botaoCancelarAmostra = document.getElementById("botao-cancelar-amostra");
 
+  // Deixa o banner de amostra/desenho arrastável: por padrão ele fica
+  // centralizado no topo do mapa e pode acabar bloqueando a visualização
+  // da estufa que o usuário está tentando clicar.
+  function _tornarArrastavel(elemento) {
+    let arrastando = false;
+    let offsetX = 0;
+    let offsetY = 0;
+
+    elemento.addEventListener("mousedown", (evento) => {
+      if (evento.target.closest("button")) return;
+      const pai = elemento.offsetParent.getBoundingClientRect();
+      const rect = elemento.getBoundingClientRect();
+      arrastando = true;
+      offsetX = evento.clientX - rect.left;
+      offsetY = evento.clientY - rect.top;
+      elemento.style.left = `${rect.left - pai.left}px`;
+      elemento.style.top = `${rect.top - pai.top}px`;
+      elemento.style.transform = "none";
+      evento.preventDefault();
+    });
+
+    document.addEventListener("mousemove", (evento) => {
+      if (!arrastando) return;
+      const pai = elemento.offsetParent.getBoundingClientRect();
+      const novoLeft = Math.max(
+        0,
+        Math.min(evento.clientX - pai.left - offsetX, pai.width - elemento.offsetWidth)
+      );
+      const novoTop = Math.max(
+        0,
+        Math.min(evento.clientY - pai.top - offsetY, pai.height - elemento.offsetHeight)
+      );
+      elemento.style.left = `${novoLeft}px`;
+      elemento.style.top = `${novoTop}px`;
+    });
+
+    document.addEventListener("mouseup", () => {
+      arrastando = false;
+    });
+  }
+
+  _tornarArrastavel(bannerAmostra);
+
   let projetoAtual = null;
 
   function encontrarEstufa(estufaId) {
