@@ -311,8 +311,15 @@ def _gerar_imagem_mapa(
     altura_final = base.height
 
     for estufa in estufas:
-        cx, cy = _centro(estufa["poligono"])
-        centro_estufa = (cx * fator_render, cy * fator_render)
+        # O título da estufa fica sempre ACIMA do polígono (nunca no meio),
+        # para nunca sobrepor os rótulos das áreas dela — que ficam dentro
+        # das suas próprias caixas, como antes.
+        cx, _ = _centro(estufa["poligono"])
+        y_topo = min(p["y"] for p in estufa["poligono"])
+        centro_estufa = (
+            cx * fator_render,
+            y_topo * fator_render - tamanho_fonte_estufa * 1.1,
+        )
         rotulos.append(
             {
                 "centro_frac": (centro_estufa[0] / largura_final, centro_estufa[1] / altura_final),
