@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from fpdf import FPDF
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 
 from backend.servicos import estufa_servico, projeto_servico, resumo_servico, variedade_servico
 
@@ -212,45 +212,6 @@ def _centro(poligono: list[dict[str, float]]) -> tuple[float, float]:
     return x, y
 
 
-def _fonte(tamanho: int) -> ImageFont.ImageFont:
-    try:
-        return ImageFont.load_default(size=tamanho)
-    except TypeError:
-        return ImageFont.load_default()
-
-
-def _desenhar_fundo_rotulo(
-    draw: ImageDraw.ImageDraw,
-    centro: tuple[float, float],
-    linhas: list[str],
-    fonte: ImageFont.ImageFont,
-) -> None:
-    """Desenha só o retângulo branco translúcido atrás de um rótulo, para
-    garantir legibilidade sobre qualquer cor da foto.
-
-    O texto em si NÃO é desenhado aqui — é desenhado depois, como texto
-    vetorial do PDF (ver `_desenhar_rotulos_vetoriais`), para continuar
-    nítido em qualquer zoom. O retângulo (cor sólida, sem detalhe fino)
-    pode continuar rasterizado sem perda perceptível de qualidade; a
-    fonte do Pillow aqui serve só para medir o tamanho da caixa.
-    """
-    alturas_linha = []
-    larguras_linha = []
-    for linha in linhas:
-        caixa = draw.textbbox((0, 0), linha, font=fonte)
-        larguras_linha.append(caixa[2] - caixa[0])
-        alturas_linha.append(caixa[3] - caixa[1])
-
-    largura_total = max(larguras_linha) if larguras_linha else 0
-    altura_total = sum(alturas_linha) + 2 * (len(linhas) - 1)
-
-    x0 = centro[0] - largura_total / 2 - 4
-    y0 = centro[1] - altura_total / 2 - 3
-    x1 = centro[0] + largura_total / 2 + 4
-    y1 = centro[1] + altura_total / 2 + 3
-    draw.rectangle([x0, y0, x1, y1], fill=(255, 255, 255, 210))
-
-
 def _desenhar_rotulos_vetoriais(
     pdf: FPDF,
     rotulos: list[dict[str, Any]],
@@ -265,15 +226,23 @@ def _desenhar_rotulos_vetoriais(
 
     Ao contrário de texto desenhado com Pillow dentro de um bitmap, texto
     vetorial do fpdf2 continua nítido em qualquer nível de zoom no leitor
-    de PDF — é o que corrige o "borrado" que persistia mesmo depois de
-    aumentar a resolução da imagem de trabalho.
+    de PDF. Para legibilidade sobre a foto, em vez de uma caixa de fundo
+    (que ficava com aspecto de "blocão" branco), o texto é desenhado com
+    contorno branco ao redor das letras — a mesma técnica usada no SVG do
+    mapa no navegador (`paint-order: stroke` + `stroke` branco em
+    `frontend/css/style.css`).
     """
+    largura_linha_original = pdf.line_width
+    pdf.set_draw_color(255, 255, 255)
     pdf.set_text_color(25, 35, 20)
+    pdf.text_mode = "FILL_STROKE"
+
     for rotulo in rotulos:
         cx = x0 + rotulo["centro_frac"][0] * largura_mm
         cy = y0 + rotulo["centro_frac"][1] * altura_mm
         tamanho_pt = max(6.0, rotulo["tamanho_fonte_px"] * px_para_pt)
         pdf.set_font("Helvetica", "B", tamanho_pt)
+        pdf.set_line_width(tamanho_pt * 0.35276 * 0.18)  # contorno proporcional ao tamanho da fonte
 
         linhas = [_texto_seguro(linha) for linha in rotulo["linhas"]]
         altura_linha = tamanho_pt * 0.4
@@ -285,7 +254,10 @@ def _desenhar_rotulos_vetoriais(
             pdf.cell(largura_caixa, altura_linha, linha, align="C")
             y_atual += altura_linha
 
+    pdf.text_mode = "FILL"
     pdf.set_text_color(0, 0, 0)
+    pdf.set_draw_color(0, 0, 0)
+    pdf.set_line_width(largura_linha_original)
 
 
 def _gerar_imagem_mapa(
@@ -324,22 +296,15 @@ def _gerar_imagem_mapa(
                 cor = cor_neutra
             draw_overlay.polygon(pontos_area, fill=cor, outline=(255, 255, 255, 255), width=espessura_area)
 
-    composta_rgba = Image.alpha_composite(base, overlay)
+    composta = Image.alpha_composite(base, overlay).convert("RGB")
 
-    # Os fundos dos rótulos são desenhados numa camada RGBA própria, e só
-    # depois compostos com alpha_composite — se fossem desenhados direto
-    # sobre a imagem já convertida para RGB, o canal alfa do fundo
-    # translúcido seria ignorado pelo Pillow e viraria um branco sólido
-    # opaco. O texto em si não é desenhado aqui — ver `rotulos`, abaixo,
-    # desenhado depois como texto vetorial do PDF (fica nítido em
-    # qualquer zoom, ao contrário de texto "assado" num bitmap).
-    overlay_texto = Image.new("RGBA", base.size, (0, 0, 0, 0))
-    draw_texto = ImageDraw.Draw(overlay_texto)
-
+    # Os rótulos não são desenhados na imagem — só a posição/texto/tamanho
+    # são calculados aqui; o desenho em si acontece depois como texto
+    # vetorial do PDF (`_desenhar_rotulos_vetoriais`), com contorno branco
+    # ao redor das letras para legibilidade (em vez de uma caixa de
+    # fundo), continuando nítido em qualquer nível de zoom.
     tamanho_fonte_estufa = max(14, 16 * escala)
     tamanho_fonte_area = max(10, 11 * escala)
-    fonte_estufa = _fonte(tamanho_fonte_estufa)
-    fonte_area = _fonte(tamanho_fonte_area)
 
     rotulos: list[dict[str, Any]] = []
     largura_final = base.width
@@ -348,12 +313,10 @@ def _gerar_imagem_mapa(
     for estufa in estufas:
         cx, cy = _centro(estufa["poligono"])
         centro_estufa = (cx * fator_render, cy * fator_render)
-        linhas_estufa = [f"{estufa['numero']} · {estufa['nome']}"]
-        _desenhar_fundo_rotulo(draw_texto, centro_estufa, linhas_estufa, fonte_estufa)
         rotulos.append(
             {
                 "centro_frac": (centro_estufa[0] / largura_final, centro_estufa[1] / altura_final),
-                "linhas": linhas_estufa,
+                "linhas": [f"{estufa['numero']} · {estufa['nome']}"],
                 "tamanho_fonte_px": tamanho_fonte_estufa,
             }
         )
@@ -361,21 +324,17 @@ def _gerar_imagem_mapa(
         for area in estufa.get("areas") or []:
             cx, cy = _centro(area["poligono"])
             centro_area = (cx * fator_render, cy * fator_render)
-            linhas_area = [
-                f"A{area['ordem']}",
-                f"{area.get('canteiros') or '-'}x{area.get('vaos') or '-'}x{area.get('postinhos') or '-'}",
-                area.get("variedade_nome") or "Sem variedade",
-            ]
-            _desenhar_fundo_rotulo(draw_texto, centro_area, linhas_area, fonte_area)
             rotulos.append(
                 {
                     "centro_frac": (centro_area[0] / largura_final, centro_area[1] / altura_final),
-                    "linhas": linhas_area,
+                    "linhas": [
+                        f"A{area['ordem']}",
+                        f"{area.get('canteiros') or '-'}x{area.get('vaos') or '-'}x{area.get('postinhos') or '-'}",
+                        area.get("variedade_nome") or "Sem variedade",
+                    ],
                     "tamanho_fonte_px": tamanho_fonte_area,
                 }
             )
-
-    composta = Image.alpha_composite(composta_rgba, overlay_texto).convert("RGB")
 
     if composta.width > LARGURA_MAXIMA_IMAGEM_PDF:
         proporcao = LARGURA_MAXIMA_IMAGEM_PDF / composta.width
