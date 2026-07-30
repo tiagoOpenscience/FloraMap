@@ -22,6 +22,14 @@ from backend.servicos import estufa_servico, projeto_servico, resumo_servico, va
 
 LARGURA_MAXIMA_IMAGEM_PDF = 1800  # px — evita PDFs enormes com fotos muito grandes
 
+# Largura mínima de trabalho para compor o mapa. Fotos de propriedades
+# menores costumam ter poucas centenas de pixels de largura — desenhar o
+# texto dos rótulos nessa resolução nativa (fontes de ~11-16px) e depois
+# esticar a imagem para a largura da página do PDF deixa as letras
+# borradas/pixeladas. Ampliar a imagem antes de desenhar os rótulos (e
+# só then reduzir, se preciso, no limite acima) mantém o texto nítido.
+RESOLUCAO_MINIMA_RENDER = 1600  # px
+
 
 def gerar_csv(projeto_id: int) -> str:
     estufas = estufa_servico.listar_estufas(projeto_id)
@@ -234,6 +242,14 @@ def _gerar_imagem_mapa(
     caminho_imagem: str, estufas: list[dict[str, Any]]
 ) -> Image.Image:
     base = Image.open(caminho_imagem).convert("RGBA")
+
+    fator_render = max(1.0, RESOLUCAO_MINIMA_RENDER / base.width)
+    if fator_render > 1.0:
+        base = base.resize(
+            (round(base.width * fator_render), round(base.height * fator_render)),
+            Image.LANCZOS,
+        )
+
     overlay = Image.new("RGBA", base.size, (0, 0, 0, 0))
     draw_overlay = ImageDraw.Draw(overlay)
 
@@ -243,12 +259,12 @@ def _gerar_imagem_mapa(
     cor_neutra = (207, 214, 199, 150)
 
     for estufa in estufas:
-        pontos_estufa = [(p["x"], p["y"]) for p in estufa["poligono"]]
+        pontos_estufa = [(p["x"] * fator_render, p["y"] * fator_render) for p in estufa["poligono"]]
         if len(pontos_estufa) >= 2:
             draw_overlay.polygon(pontos_estufa, outline=(47, 111, 78, 255), width=espessura_estufa)
 
         for area in estufa.get("areas") or []:
-            pontos_area = [(p["x"], p["y"]) for p in area["poligono"]]
+            pontos_area = [(p["x"] * fator_render, p["y"] * fator_render) for p in area["poligono"]]
             if len(pontos_area) < 2:
                 continue
             if area.get("variedade_cor"):
@@ -273,13 +289,15 @@ def _gerar_imagem_mapa(
     fonte_area = _fonte(max(10, 11 * escala))
 
     for estufa in estufas:
-        centro_estufa = _centro(estufa["poligono"])
+        cx, cy = _centro(estufa["poligono"])
+        centro_estufa = (cx * fator_render, cy * fator_render)
         _desenhar_texto_com_fundo(
             draw_texto, centro_estufa, [f"{estufa['numero']} · {estufa['nome']}"], fonte_estufa
         )
 
         for area in estufa.get("areas") or []:
-            centro_area = _centro(area["poligono"])
+            cx, cy = _centro(area["poligono"])
+            centro_area = (cx * fator_render, cy * fator_render)
             linhas = [
                 f"A{area['ordem']}",
                 f"{area.get('canteiros') or '-'}x{area.get('vaos') or '-'}x{area.get('postinhos') or '-'}",
