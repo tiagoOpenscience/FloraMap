@@ -100,10 +100,21 @@ def gerar_pdf(projeto_id: int) -> bytes:
         nome_arquivo = Path(projeto["imagem_path"]).name
         caminho_absoluto = projeto_servico.UPLOADS_DIR / nome_arquivo
         if caminho_absoluto.exists():
-            imagem_mapa = _gerar_imagem_mapa(str(caminho_absoluto), estufas)
+            imagem_mapa, rotulos = _gerar_imagem_mapa(str(caminho_absoluto), estufas)
             largura_disponivel = pdf.w - 2 * pdf.l_margin
-            pdf.image(imagem_mapa, w=largura_disponivel)
-            pdf.ln(4)
+            x_imagem, y_imagem = pdf.l_margin, pdf.get_y()
+            pdf.image(imagem_mapa, x=x_imagem, y=y_imagem, w=largura_disponivel)
+            altura_imagem = largura_disponivel * imagem_mapa.height / imagem_mapa.width
+
+            # Os rótulos são desenhados como texto vetorial de verdade do
+            # PDF (não "assados" no bitmap) — assim continuam nítidos em
+            # qualquer nível de zoom, igual ao resto do texto do
+            # documento. Ver CLAUDE.md / SPEC.md para o racional.
+            px_para_pt = (largura_disponivel * 72 / 25.4) / imagem_mapa.width
+            _desenhar_rotulos_vetoriais(
+                pdf, rotulos, x_imagem, y_imagem, largura_disponivel, altura_imagem, px_para_pt
+            )
+            pdf.set_xy(pdf.l_margin, y_imagem + altura_imagem + 4)
 
     _secao_resumo(pdf, resumo)
     _secao_legenda_variedades(pdf, variedades)
@@ -208,14 +219,21 @@ def _fonte(tamanho: int) -> ImageFont.ImageFont:
         return ImageFont.load_default()
 
 
-def _desenhar_texto_com_fundo(
+def _desenhar_fundo_rotulo(
     draw: ImageDraw.ImageDraw,
     centro: tuple[float, float],
     linhas: list[str],
     fonte: ImageFont.ImageFont,
 ) -> None:
-    """Desenha linhas de texto centralizadas, com um fundo branco translúcido
-    atrás para garantir legibilidade sobre qualquer cor da foto."""
+    """Desenha só o retângulo branco translúcido atrás de um rótulo, para
+    garantir legibilidade sobre qualquer cor da foto.
+
+    O texto em si NÃO é desenhado aqui — é desenhado depois, como texto
+    vetorial do PDF (ver `_desenhar_rotulos_vetoriais`), para continuar
+    nítido em qualquer zoom. O retângulo (cor sólida, sem detalhe fino)
+    pode continuar rasterizado sem perda perceptível de qualidade; a
+    fonte do Pillow aqui serve só para medir o tamanho da caixa.
+    """
     alturas_linha = []
     larguras_linha = []
     for linha in linhas:
@@ -232,15 +250,47 @@ def _desenhar_texto_com_fundo(
     y1 = centro[1] + altura_total / 2 + 3
     draw.rectangle([x0, y0, x1, y1], fill=(255, 255, 255, 210))
 
-    y_atual = centro[1] - altura_total / 2
-    for linha, altura in zip(linhas, alturas_linha):
-        draw.text((centro[0], y_atual), linha, font=fonte, fill=(25, 35, 20, 255), anchor="ma")
-        y_atual += altura + 2
+
+def _desenhar_rotulos_vetoriais(
+    pdf: FPDF,
+    rotulos: list[dict[str, Any]],
+    x0: float,
+    y0: float,
+    largura_mm: float,
+    altura_mm: float,
+    px_para_pt: float,
+) -> None:
+    """Desenha os rótulos de estufa/área como texto vetorial real do PDF,
+    posicionados por cima da imagem do mapa já embutida.
+
+    Ao contrário de texto desenhado com Pillow dentro de um bitmap, texto
+    vetorial do fpdf2 continua nítido em qualquer nível de zoom no leitor
+    de PDF — é o que corrige o "borrado" que persistia mesmo depois de
+    aumentar a resolução da imagem de trabalho.
+    """
+    pdf.set_text_color(25, 35, 20)
+    for rotulo in rotulos:
+        cx = x0 + rotulo["centro_frac"][0] * largura_mm
+        cy = y0 + rotulo["centro_frac"][1] * altura_mm
+        tamanho_pt = max(6.0, rotulo["tamanho_fonte_px"] * px_para_pt)
+        pdf.set_font("Helvetica", "B", tamanho_pt)
+
+        linhas = [_texto_seguro(linha) for linha in rotulo["linhas"]]
+        altura_linha = tamanho_pt * 0.4
+        largura_caixa = max(pdf.get_string_width(linha) for linha in linhas) + 4
+        y_atual = cy - (len(linhas) * altura_linha) / 2
+
+        for linha in linhas:
+            pdf.set_xy(cx - largura_caixa / 2, y_atual)
+            pdf.cell(largura_caixa, altura_linha, linha, align="C")
+            y_atual += altura_linha
+
+    pdf.set_text_color(0, 0, 0)
 
 
 def _gerar_imagem_mapa(
     caminho_imagem: str, estufas: list[dict[str, Any]]
-) -> Image.Image:
+) -> tuple[Image.Image, list[dict[str, Any]]]:
     base = Image.open(caminho_imagem).convert("RGBA")
 
     fator_render = max(1.0, RESOLUCAO_MINIMA_RENDER / base.width)
@@ -276,34 +326,54 @@ def _gerar_imagem_mapa(
 
     composta_rgba = Image.alpha_composite(base, overlay)
 
-    # Os rótulos são desenhados numa camada RGBA própria, e só depois
-    # compostos com alpha_composite — se fossem desenhados direto sobre
-    # a imagem já convertida para RGB, o canal alfa do fundo translúcido
-    # (usado para o texto continuar legível sobre qualquer cor da foto)
-    # seria ignorado pelo Pillow e viraria um branco sólido opaco atrás
-    # das letras.
+    # Os fundos dos rótulos são desenhados numa camada RGBA própria, e só
+    # depois compostos com alpha_composite — se fossem desenhados direto
+    # sobre a imagem já convertida para RGB, o canal alfa do fundo
+    # translúcido seria ignorado pelo Pillow e viraria um branco sólido
+    # opaco. O texto em si não é desenhado aqui — ver `rotulos`, abaixo,
+    # desenhado depois como texto vetorial do PDF (fica nítido em
+    # qualquer zoom, ao contrário de texto "assado" num bitmap).
     overlay_texto = Image.new("RGBA", base.size, (0, 0, 0, 0))
     draw_texto = ImageDraw.Draw(overlay_texto)
 
-    fonte_estufa = _fonte(max(14, 16 * escala))
-    fonte_area = _fonte(max(10, 11 * escala))
+    tamanho_fonte_estufa = max(14, 16 * escala)
+    tamanho_fonte_area = max(10, 11 * escala)
+    fonte_estufa = _fonte(tamanho_fonte_estufa)
+    fonte_area = _fonte(tamanho_fonte_area)
+
+    rotulos: list[dict[str, Any]] = []
+    largura_final = base.width
+    altura_final = base.height
 
     for estufa in estufas:
         cx, cy = _centro(estufa["poligono"])
         centro_estufa = (cx * fator_render, cy * fator_render)
-        _desenhar_texto_com_fundo(
-            draw_texto, centro_estufa, [f"{estufa['numero']} · {estufa['nome']}"], fonte_estufa
+        linhas_estufa = [f"{estufa['numero']} · {estufa['nome']}"]
+        _desenhar_fundo_rotulo(draw_texto, centro_estufa, linhas_estufa, fonte_estufa)
+        rotulos.append(
+            {
+                "centro_frac": (centro_estufa[0] / largura_final, centro_estufa[1] / altura_final),
+                "linhas": linhas_estufa,
+                "tamanho_fonte_px": tamanho_fonte_estufa,
+            }
         )
 
         for area in estufa.get("areas") or []:
             cx, cy = _centro(area["poligono"])
             centro_area = (cx * fator_render, cy * fator_render)
-            linhas = [
+            linhas_area = [
                 f"A{area['ordem']}",
                 f"{area.get('canteiros') or '-'}x{area.get('vaos') or '-'}x{area.get('postinhos') or '-'}",
                 area.get("variedade_nome") or "Sem variedade",
             ]
-            _desenhar_texto_com_fundo(draw_texto, centro_area, linhas, fonte_area)
+            _desenhar_fundo_rotulo(draw_texto, centro_area, linhas_area, fonte_area)
+            rotulos.append(
+                {
+                    "centro_frac": (centro_area[0] / largura_final, centro_area[1] / altura_final),
+                    "linhas": linhas_area,
+                    "tamanho_fonte_px": tamanho_fonte_area,
+                }
+            )
 
     composta = Image.alpha_composite(composta_rgba, overlay_texto).convert("RGB")
 
@@ -312,4 +382,4 @@ def _gerar_imagem_mapa(
         nova_altura = int(composta.height * proporcao)
         composta = composta.resize((LARGURA_MAXIMA_IMAGEM_PDF, nova_altura), Image.LANCZOS)
 
-    return composta
+    return composta, rotulos
