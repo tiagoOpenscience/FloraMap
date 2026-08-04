@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FloraMap — Entrar</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <main class="pagina-login">
+    <div class="pagina-login__cartao">
+      <h1 class="pagina-login__titulo">FloraMap</h1>
+      <p class="pagina-login__subtitulo">Gerenciamento das estufas da Cooperflora.</p>
+
+      <form id="form-login">
+        <label for="input-senha">Senha de acesso</label>
+        <input type="password" id="input-senha" autocomplete="current-password" autofocus />
+        <button type="submit" class="primario" style="width: 100%; margin-top: 12px;">Entrar</button>
+      </form>
+      <p id="erro-login" style="color: var(--cor-perigo); font-size: 12px; margin-top: 10px;"></p>
+    </div>
+  </main>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/login.js"></script>
+</body>
+</html>

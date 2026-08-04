@@ -10,11 +10,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   const inputImagem = document.getElementById("input-imagem");
   const botaoDetectar = document.getElementById("botao-detectar");
   const botaoDesenhar = document.getElementById("botao-desenhar");
+  const botaoAdicionarEntrada = document.getElementById("botao-adicionar-entrada");
+  const botaoAdicionarSaida = document.getElementById("botao-adicionar-saida");
 
   const bannerAmostra = document.getElementById("banner-amostra");
   const textoBanner = document.getElementById("texto-banner-amostra");
   const botaoConcluirAmostra = document.getElementById("botao-concluir-amostra");
   const botaoCancelarAmostra = document.getElementById("botao-cancelar-amostra");
+  const legendaAcessos = document.getElementById("legenda-acessos");
+  const legendaVariedades = document.getElementById("legenda-variedades");
 
   // Deixa o banner de amostra/desenho arrastável: por padrão ele fica
   // centralizado no topo do mapa e pode acabar bloqueando a visualização
@@ -69,6 +73,52 @@ document.addEventListener("DOMContentLoaded", async () => {
     Sidebar.mostrarVisaoGeral(projetoId);
   }
 
+  // Legenda de variedades (canto inferior direito do mapa): mostra só
+  // as variedades realmente em uso em alguma área deste projeto, para
+  // não listar o cadastro global inteiro sem relação com o mapa atual.
+  function atualizarLegendaVariedades() {
+    const vistos = new Map();
+    for (const estufa of projetoAtual?.estufas || []) {
+      for (const area of estufa.areas || []) {
+        if (area.variedade_id && area.variedade_cor) {
+          vistos.set(area.variedade_id, { nome: area.variedade_nome, cor: area.variedade_cor });
+        }
+      }
+    }
+
+    const itens = Array.from(vistos.values()).sort((a, b) => a.nome.localeCompare(b.nome));
+
+    legendaVariedades.innerHTML = "";
+    if (itens.length === 0) {
+      legendaVariedades.hidden = true;
+      return;
+    }
+
+    const titulo = document.createElement("div");
+    titulo.className = "legenda-variedades__titulo";
+    titulo.textContent = "Variedades";
+    legendaVariedades.appendChild(titulo);
+
+    for (const item of itens) {
+      const linha = document.createElement("div");
+      linha.className = "legenda-variedades__item";
+
+      const cor = document.createElement("span");
+      cor.className = "legenda-variedades__cor";
+      cor.style.background = item.cor;
+      linha.appendChild(cor);
+
+      const nome = document.createElement("span");
+      nome.className = "legenda-variedades__nome";
+      nome.textContent = item.nome;
+      linha.appendChild(nome);
+
+      legendaVariedades.appendChild(linha);
+    }
+
+    legendaVariedades.hidden = !projetoAtual?.imagem_path;
+  }
+
   async function selecionarEstufa(estufa) {
     Mapa.marcarEstufaSelecionada(estufa.id);
     Sidebar.mostrarEstufa(estufa, {
@@ -114,6 +164,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         Mapa.atualizarCorArea(areaId, atualizada.variedade_cor);
         Mapa.atualizarRotuloArea(areaId, atualizada);
         Object.assign(area, atualizada);
+        atualizarLegendaVariedades();
         return atualizada;
       },
       aoVoltarParaEstufa: (estufaDaArea) => {
@@ -134,6 +185,24 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
+  async function excluirPontoAcesso(ponto) {
+    const rotulo = ponto.tipo === "entrada" ? "entrada" : "saída";
+    const confirmado = confirm(`Remover esta marcação de ${rotulo}?`);
+    if (!confirmado) return;
+
+    try {
+      await Api.excluirPontoAcesso(ponto.id);
+      Mapa.removerMarcadorAcesso(ponto.id);
+      if (projetoAtual) {
+        projetoAtual.pontos_acesso = (projetoAtual.pontos_acesso || []).filter(
+          (p) => p.id !== ponto.id
+        );
+      }
+    } catch (erro) {
+      alert(erro.message);
+    }
+  }
+
   Mapa.iniciar({
     vazio: document.getElementById("mapa-vazio"),
     palco: document.getElementById("mapa-palco"),
@@ -141,6 +210,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     svg: document.getElementById("mapa-svg"),
     aoSelecionarEstufa: selecionarEstufa,
     aoSelecionarArea: selecionarArea,
+    aoClicarAcesso: excluirPontoAcesso,
   });
 
   Sidebar.iniciar({
@@ -164,6 +234,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   document.getElementById("botao-visao-geral").addEventListener("click", mostrarVisaoGeral);
+
+  document.getElementById("botao-sair").addEventListener("click", async () => {
+    await Api.logout();
+    window.location.href = "/login.html";
+  });
 
   Undo.iniciar({
     aoRestaurar: async (idDoProjeto, snapshot) => {
@@ -189,9 +264,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     elNomeProjeto.textContent = projetoAtual.nome;
     botaoDetectar.disabled = !projetoAtual.imagem_path;
     botaoDesenhar.disabled = !projetoAtual.imagem_path;
+    botaoAdicionarEntrada.disabled = !projetoAtual.imagem_path;
+    botaoAdicionarSaida.disabled = !projetoAtual.imagem_path;
+    legendaAcessos.hidden = !projetoAtual.imagem_path;
 
     if (projetoAtual.imagem_path) {
-      Mapa.carregar({ imagemUrl: projetoAtual.imagem_path, estufas: projetoAtual.estufas || [] });
+      Mapa.carregar({
+        imagemUrl: projetoAtual.imagem_path,
+        estufas: projetoAtual.estufas || [],
+        pontosAcesso: projetoAtual.pontos_acesso || [],
+      });
     } else {
       Mapa.mostrarVazio();
     }
@@ -199,6 +281,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!manterSidebar) {
       mostrarVisaoGeral();
     }
+
+    atualizarLegendaVariedades();
   }
 
   inputImagem.addEventListener("change", async () => {
@@ -240,6 +324,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const pontos = [];
     textoBanner.textContent =
       "Clique em um ou mais pontos de estufas conhecidas (se a cobertura for listrada, clique numa parte clara e noutra escura). Depois clique em Concluir.";
+    botaoConcluirAmostra.hidden = false;
     botaoConcluirAmostra.textContent = "Concluir (0 pontos)";
     botaoConcluirAmostra.disabled = true;
     bannerAmostra.hidden = false;
@@ -278,6 +363,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     textoBanner.textContent =
       "Clique nos cantos da estufa para desenhar o contorno (mínimo 3 pontos). Depois clique em Concluir.";
+    botaoConcluirAmostra.hidden = false;
     botaoConcluirAmostra.textContent = "Concluir (0 pontos)";
     botaoConcluirAmostra.disabled = true;
     bannerAmostra.hidden = false;
@@ -302,6 +388,31 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
     };
   });
+
+  // ---------- Modo de posicionar entrada/saída (marcador único) ----------
+
+  function ativarModoAcesso(tipo, rotulo) {
+    if (!projetoAtual?.imagem_path) return;
+
+    textoBanner.textContent = `Clique no mapa para marcar a ${rotulo}.`;
+    botaoConcluirAmostra.hidden = true;
+    bannerAmostra.hidden = false;
+
+    finalizarModoAtual = Mapa.iniciarModoPonto(async (x, y) => {
+      _encerrarBanner();
+      try {
+        const ponto = await Api.criarPontoAcesso(projetoId, tipo, x, y);
+        projetoAtual.pontos_acesso = projetoAtual.pontos_acesso || [];
+        projetoAtual.pontos_acesso.push(ponto);
+        Mapa.adicionarMarcadorAcesso(ponto);
+      } catch (erro) {
+        alert(erro.message);
+      }
+    });
+  }
+
+  botaoAdicionarEntrada.addEventListener("click", () => ativarModoAcesso("entrada", "entrada"));
+  botaoAdicionarSaida.addEventListener("click", () => ativarModoAcesso("saida", "saída"));
 
   botaoCancelarAmostra.addEventListener("click", () => {
     _encerrarBanner();

@@ -9,14 +9,16 @@ const Mapa = (() => {
   let elSvg;
   let aoSelecionarEstufaCb = () => {};
   let aoSelecionarAreaCb = () => {};
+  let aoClicarAcessoCb = () => {};
 
-  function iniciar({ vazio, palco, imagem, svg, aoSelecionarEstufa, aoSelecionarArea }) {
+  function iniciar({ vazio, palco, imagem, svg, aoSelecionarEstufa, aoSelecionarArea, aoClicarAcesso }) {
     elVazio = vazio;
     elPalco = palco;
     elImagem = imagem;
     elSvg = svg;
     aoSelecionarEstufaCb = aoSelecionarEstufa || (() => {});
     aoSelecionarAreaCb = aoSelecionarArea || (() => {});
+    aoClicarAcessoCb = aoClicarAcesso || (() => {});
   }
 
   function mostrarVazio() {
@@ -127,7 +129,22 @@ const Mapa = (() => {
     elSvg.appendChild(grupo);
   }
 
-  function carregar({ imagemUrl, estufas }) {
+  function _desenharMarcadorAcesso(ponto) {
+    const ns = "http://www.w3.org/2000/svg";
+    const marcador = document.createElementNS(ns, "circle");
+    marcador.setAttribute("cx", ponto.x);
+    marcador.setAttribute("cy", ponto.y);
+    marcador.setAttribute("r", 7);
+    marcador.setAttribute("class", `marcador-acesso marcador-acesso--${ponto.tipo}`);
+    marcador.dataset.acessoId = ponto.id;
+    marcador.addEventListener("click", (evento) => {
+      evento.stopPropagation();
+      aoClicarAcessoCb(ponto);
+    });
+    elSvg.appendChild(marcador);
+  }
+
+  function carregar({ imagemUrl, estufas, pontosAcesso }) {
     elVazio.style.display = "none";
     elPalco.classList.add("visivel");
 
@@ -142,6 +159,18 @@ const Mapa = (() => {
     for (const estufa of estufas || []) {
       _desenharEstufa(estufa);
     }
+    for (const ponto of pontosAcesso || []) {
+      _desenharMarcadorAcesso(ponto);
+    }
+  }
+
+  function adicionarMarcadorAcesso(ponto) {
+    _desenharMarcadorAcesso(ponto);
+  }
+
+  function removerMarcadorAcesso(acessoId) {
+    const marcador = elSvg.querySelector(`circle.marcador-acesso[data-acesso-id="${acessoId}"]`);
+    if (marcador) marcador.remove();
   }
 
   function marcarEstufaSelecionada(estufaId) {
@@ -277,6 +306,22 @@ const Mapa = (() => {
     };
   }
 
+  // Modo de ponto único: um clique no mapa posiciona um marcador de
+  // entrada/saída e o modo se encerra sozinho (chame o finalizar
+  // retornado se o usuário cancelar antes de clicar).
+  function iniciarModoPonto(aoClicar) {
+    const overlay = _criarOverlayClicavel();
+
+    overlay.addEventListener("click", (evento) => {
+      const { x, y } = _pontoDoEvento(evento);
+      aoClicar(x, y);
+    });
+
+    return function finalizar() {
+      if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+    };
+  }
+
   return {
     iniciar,
     mostrarVazio,
@@ -288,5 +333,8 @@ const Mapa = (() => {
     atualizarRotuloArea,
     iniciarModoAmostra,
     iniciarModoDesenho,
+    iniciarModoPonto,
+    adicionarMarcadorAcesso,
+    removerMarcadorAcesso,
   };
 })();

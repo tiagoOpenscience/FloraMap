@@ -26,9 +26,10 @@ Dentro do escopo:
 - Exportação em PDF (mapa + tabelas) e CSV (tabela).
 - Desfazer (Ctrl+Z) de ações estruturais destrutivas.
 - Persistência em SQLite, sem necessidade de ação explícita de salvar.
+- Acesso protegido por uma senha única compartilhada por todo o time (sem contas por pessoa).
 
 Fora do escopo:
-- Múltiplos usuários simultâneos, permissões e autenticação.
+- Contas por usuário, permissões e múltiplos níveis de acesso (o que existe é uma senha única compartilhada — ver seção 3.13).
 - Histórico/auditoria completo (o undo cobre só a sessão atual, em memória no navegador).
 - Refazer (redo).
 - Aplicativo mobile.
@@ -86,13 +87,19 @@ Fora do escopo:
 - nome
 - cor (hexadecimal)
 
+### Ponto de Acesso
+- id
+- projeto_id (FK)
+- tipo (`entrada` | `saida`)
+- x, y (coordenadas no SVG)
+
 ## 2.2 Relacionamentos
 
 ```
 Projeto (1) ──< Estufa (N) ──< Área (N) >── Variedade (opcional)
 ```
 
-Exclusão em cascata: excluir um Projeto remove suas Estufas e Áreas (e o arquivo de imagem no disco); excluir uma Estufa remove suas Áreas; excluir uma Variedade em uso apenas desvincula as Áreas (`variedade_id` vira `NULL`).
+Exclusão em cascata: excluir um Projeto remove suas Estufas e Áreas (e o arquivo de imagem no disco); excluir uma Estufa remove suas Áreas; excluir uma Variedade em uso apenas desvincula as Áreas (`variedade_id` vira `NULL`). Excluir um Projeto também remove seus Pontos de Acesso.
 
 ---
 
@@ -102,7 +109,7 @@ Exclusão em cascata: excluir um Projeto remove suas Estufas e Áreas (e o arqui
 Criar (Home), abrir, renomear (Home), excluir (Home, com confirmação — remove estufas/áreas/imagem em cascata).
 
 ## 3.2 Importar Imagem
-Upload de PNG/JPEG; fica associada ao projeto e é exibida como plano de fundo do mapa.
+Upload de PNG/JPEG; fica associada ao projeto e é exibida como plano de fundo do mapa. Ao salvar, a imagem é redimensionada (largura máxima de 2000px, mantendo proporção) e recomprimida como JPEG (qualidade ~85), independente do formato original — reduz bastante o espaço em disco por projeto (relevante em hospedagens com cota apertada, ver `DEPLOY.md`) sem perda perceptível, já que o mapa e o PDF exportado já usam resolução menor que a maioria das fotos aéreas originais. Reenviar uma imagem substitui a anterior (inclusive removendo o arquivo antigo do disco se a extensão mudou).
 
 ## 3.3 Detectar Estufas (calibrado por amostra)
 1. Usuário clica em "Detectar estufas". Se já existirem estufas no projeto, é pedida confirmação (a detecção substitui todas as estufas e áreas atuais).
@@ -132,11 +139,18 @@ A Visão Geral é o estado padrão. Selecionar uma Estufa ou Área muda o painel
 ## 3.9 Desfazer (Ctrl+Z)
 Funciona em qualquer lugar da tela principal (exceto com foco em campo de texto, onde o undo nativo do navegador tem prioridade). Desfaz a última ação estrutural destrutiva: detectar, gerar áreas, dividir estufa, excluir estufa, excluir área. Não desfaz edições de campo isoladas.
 
-## 3.10 Exportar
+## 3.10 Marcar Entrada/Saída
+
+Toolbar tem os botões "Adicionar entrada" e "Adicionar saída". Ao clicar em um deles, um banner pede um único clique no mapa; esse clique posiciona um marcador circular (verde para entrada, vermelho para saída) na coordenada clicada e salva automaticamente via API — sem confirmar ou digitar nada. Não há rótulo de texto no mapa ao lado de cada marcador (para não poluir a imagem); uma legenda fixa no canto inferior esquerdo do mapa (visível sempre que há uma imagem carregada) explica que verde é entrada e vermelho é saída. Clicar num marcador já existente pede confirmação e o exclui. Os marcadores também aparecem no PDF exportado, com a mesma legenda.
+
+## 3.11 Exportar
 Na Visão Geral: "Exportar PDF" (mapa com estufas/áreas desenhadas e rotuladas + legenda de variedades + resumo + tabela + observações/análise) e "Exportar CSV" (tabela: Estufa, Número, Área, Variedade, Fase, Vãos, Canteiros, Postinhos).
 
-## 3.11 Salvar Automaticamente
+## 3.12 Salvar Automaticamente
 Nunca há botão "Salvar". Toda alteração de campo dispara uma chamada à API (com debounce curto para campos de texto — cada campo tem seu próprio temporizador, para não perder edições em campos diferentes feitas em sequência rápida) que persiste imediatamente, com indicador "Salvando..." / "Salvo automaticamente".
+
+## 3.13 Autenticação (senha única compartilhada)
+O sistema fica atrás de uma senha única, compartilhada por todo o time (não há conta por pessoa). Ao acessar qualquer página sem sessão válida, o usuário é redirecionado para `/login.html`; chamadas de API sem sessão válida recebem `401`. Após informar a senha correta em `/login.html`, uma sessão é criada (cookie de sessão do Flask, válida por 30 dias) e todas as telas ficam acessíveis normalmente. O botão "Sair" (na Home e na barra superior da tela do projeto) encerra a sessão. A senha em si nunca é guardada em texto puro: o servidor guarda apenas o hash dela numa variável de ambiente (`FLORAMAP_SENHA_HASH`) — ver `DEPLOY.md` para como gerar e trocar esse hash.
 
 ---
 
@@ -177,10 +191,10 @@ Nunca há botão "Salvar". Toda alteração de campo dispara uma chamada à API 
 ```
 
 ### 4.2.1 Toolbar
-"Enviar Imagem" · "Detectar estufas" (desabilitado sem imagem) · "Desenhar estufa" (desabilitado sem imagem) · "Variedades" (abre modal) · "Visão Geral" (atalho para o estado padrão do painel).
+"Enviar Imagem" · "Detectar estufas" (desabilitado sem imagem) · "Desenhar estufa" (desabilitado sem imagem) · "Adicionar entrada" (desabilitado sem imagem) · "Adicionar saída" (desabilitado sem imagem) · "Variedades" (abre modal) · "Visão Geral" (atalho para o estado padrão do painel).
 
 ### 4.2.2 Mapa
-Imagem aérea de fundo + SVG com um polígono por Estufa e, dentro dela, um polígono por Área (quando geradas). Área colorida pela variedade (ou cor neutra se nenhuma). Clique numa Estufa sem áreas seleciona a Estufa; clique numa Área seleciona a Área. Rótulos: ver seção 5 do `CLAUDE.md` ("Decisões de projeto importantes") e seção 8.4 abaixo.
+Imagem aérea de fundo + SVG com um polígono por Estufa e, dentro dela, um polígono por Área (quando geradas). Área colorida pela variedade (ou cor neutra se nenhuma). Clique numa Estufa sem áreas seleciona a Estufa; clique numa Área seleciona a Área. Rótulos: ver seção 5 do `CLAUDE.md` ("Decisões de projeto importantes") e seção 8.4 abaixo. Marcadores de entrada (verde) e saída (vermelho) ficam sobrepostos ao mapa, sem rótulo de texto; uma legenda fixa no canto inferior esquerdo explica as cores (ver seção 3.10). No canto inferior direito, uma segunda legenda lista as variedades em uso no projeto (cor + nome), calculada a partir das áreas já preenchidas — some automaticamente se nenhuma área tem variedade definida.
 
 ### 4.2.3 Painel Lateral — estados
 
@@ -259,6 +273,10 @@ Ver `backend/schema.sql` (fonte da verdade) e a seção 2 acima para os campos p
 
 Todos os endpoints abaixo existem e estão implementados.
 
+## Autenticação
+- `POST /api/login` `{senha}` — valida contra `FLORAMAP_SENHA_HASH`; cria sessão (200) ou `401` se errada
+- `POST /api/logout` — encerra a sessão
+
 ## Projetos
 - `GET /api/projetos` — lista
 - `POST /api/projetos` `{nome}` — cria
@@ -289,6 +307,11 @@ Todos os endpoints abaixo existem e estão implementados.
 - `GET /api/variedades`
 - `POST /api/variedades` `{nome, cor}`
 - `PATCH /api/variedades/{id}` `{nome?, cor?}`
+
+## Pontos de Acesso (entrada/saída)
+- lista embutida em `GET /api/projetos/{id}` como `pontos_acesso`
+- `POST /api/projetos/{id}/pontos-acesso` `{tipo: "entrada"|"saida", x, y}` — cria
+- `DELETE /api/pontos-acesso/{id}` — exclui
 
 ---
 

@@ -19,8 +19,11 @@
 
       <button type="button" id="botao-detectar" disabled>Detectar estufas</button>
       <button type="button" id="botao-desenhar" disabled>Desenhar estufa</button>
+      <button type="button" id="botao-adicionar-entrada" class="botao-acesso botao-acesso--entrada" disabled>Adicionar entrada</button>
+      <button type="button" id="botao-adicionar-saida" class="botao-acesso botao-acesso--saida" disabled>Adicionar saída</button>
       <button type="button" id="botao-variedades">Variedades</button>
       <button type="button" id="botao-visao-geral">Visão Geral</button>
+      <button type="button" id="botao-sair">Sair</button>
     </div>
 
     <div class="corpo">
@@ -38,6 +41,15 @@
           <button type="button" id="botao-concluir-amostra" disabled>Concluir</button>
           <button type="button" id="botao-cancelar-amostra">Cancelar</button>
         </div>
+        <div id="legenda-acessos" class="legenda-acessos" hidden>
+          <div class="legenda-acessos__item">
+            <span class="legenda-acessos__ponto legenda-acessos__ponto--entrada"></span>Entrada
+          </div>
+          <div class="legenda-acessos__item">
+            <span class="legenda-acessos__ponto legenda-acessos__ponto--saida"></span>Saída
+          </div>
+        </div>
+        <div id="legenda-variedades" class="legenda-variedades" hidden></div>
       </div>
 
       <aside class="sidebar">

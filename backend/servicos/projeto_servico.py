@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
+
+from PIL import Image
 from werkzeug.datastructures import FileStorage
 from werkzeug.utils import secure_filename
 
@@ -11,6 +13,14 @@ from backend import banco
 
 UPLOADS_DIR = banco.BASE_DIR / "uploads"
 EXTENSOES_PERMITIDAS = {"png", "jpg", "jpeg"}
+
+# Fotos aéreas de drone costumam vir com vários MB e resolução muito
+# maior do que o necessário pra visualização no mapa/exportação em PDF
+# (ver RESOLUCAO_MINIMA_RENDER em exportacao_servico.py). Recomprimir
+# no upload reduz drasticamente o espaço em disco usado por projeto —
+# importante em hospedagens com cota de disco apertada.
+LARGURA_MAXIMA_UPLOAD_PX = 2000
+QUALIDADE_JPEG_UPLOAD = 85
 
 
 def _extensao_valida(nome_arquivo: str) -> bool:
@@ -107,11 +117,30 @@ def salvar_imagem_projeto(projeto_id: int, arquivo: FileStorage) -> str:
     if projeto is None:
         raise ValueError("Projeto não encontrado.")
 
+    try:
+        imagem = Image.open(arquivo.stream)
+        imagem.load()
+    except Exception as erro:
+        raise ValueError("Não foi possível ler o arquivo de imagem enviado.") from erro
+
+    if imagem.mode != "RGB":
+        imagem = imagem.convert("RGB")
+
+    if imagem.width > LARGURA_MAXIMA_UPLOAD_PX:
+        nova_altura = round(imagem.height * LARGURA_MAXIMA_UPLOAD_PX / imagem.width)
+        imagem = imagem.resize((LARGURA_MAXIMA_UPLOAD_PX, nova_altura), Image.LANCZOS)
+
     UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
-    extensao = arquivo.filename.rsplit(".", 1)[1].lower()
-    nome_arquivo = secure_filename(f"projeto_{projeto_id}.{extensao}")
+    nome_arquivo = secure_filename(f"projeto_{projeto_id}.jpg")
     caminho_destino = UPLOADS_DIR / nome_arquivo
-    arquivo.save(caminho_destino)
+    imagem.save(caminho_destino, format="JPEG", quality=QUALIDADE_JPEG_UPLOAD)
+
+    # Se a imagem anterior tinha outra extensão (ex.: reenvio de um PNG
+    # depois que este projeto já tinha uma foto), remove o arquivo
+    # antigo pra não deixar lixo ocupando espaço em disco.
+    imagem_anterior = projeto.get("imagem_path")
+    if imagem_anterior and Path(imagem_anterior).name != nome_arquivo:
+        (UPLOADS_DIR / Path(imagem_anterior).name).unlink(missing_ok=True)
 
     imagem_path = f"/uploads/{nome_arquivo}"
     with banco.get_conexao() as conexao:

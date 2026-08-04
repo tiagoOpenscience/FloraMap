@@ -2,6 +2,20 @@
 // Nenhum outro módulo do frontend deve chamar fetch() diretamente.
 
 const Api = {
+  async login(senha) {
+    const resp = await fetch("/api/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ senha }),
+    });
+    return Api._tratarResposta(resp, { redirecionarSeDeslogado: false });
+  },
+
+  async logout() {
+    const resp = await fetch("/api/logout", { method: "POST" });
+    return Api._tratarResposta(resp, { redirecionarSeDeslogado: false });
+  },
+
   async listarProjetos() {
     const resp = await fetch("/api/projetos");
     return Api._tratarResposta(resp);
@@ -140,6 +154,20 @@ const Api = {
     return Api._tratarResposta(resp);
   },
 
+  async criarPontoAcesso(projetoId, tipo, x, y) {
+    const resp = await fetch(`/api/projetos/${projetoId}/pontos-acesso`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tipo, x, y }),
+    });
+    return Api._tratarResposta(resp);
+  },
+
+  async excluirPontoAcesso(pontoId) {
+    const resp = await fetch(`/api/pontos-acesso/${pontoId}`, { method: "DELETE" });
+    return Api._tratarResposta(resp);
+  },
+
   async listarVariedades() {
     const resp = await fetch("/api/variedades");
     return Api._tratarResposta(resp);
@@ -163,7 +191,12 @@ const Api = {
     return Api._tratarResposta(resp);
   },
 
-  async _tratarResposta(resp) {
+  async _tratarResposta(resp, { redirecionarSeDeslogado = true } = {}) {
+    if (redirecionarSeDeslogado && resp.status === 401) {
+      window.location.href = "/login.html";
+      return null;
+    }
+
     const dados = await resp.json().catch(() => null);
     if (!resp.ok) {
       const mensagem = (dados && dados.erro) || "Erro inesperado na API.";

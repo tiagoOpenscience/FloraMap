@@ -6,7 +6,7 @@ from typing import Any
 
 from flask import Blueprint, jsonify, request
 
-from backend.servicos import estufa_servico, projeto_servico, resumo_servico
+from backend.servicos import estufa_servico, ponto_acesso_servico, projeto_servico, resumo_servico
 
 bp = Blueprint("projetos", __name__, url_prefix="/api/projetos")
 
@@ -37,6 +37,7 @@ def obter(projeto_id: int) -> Any:
         return jsonify({"erro": "Projeto não encontrado."}), 404
 
     projeto["estufas"] = estufa_servico.listar_estufas(projeto_id)
+    projeto["pontos_acesso"] = ponto_acesso_servico.listar_pontos_acesso(projeto_id)
     return jsonify(projeto)
 
 

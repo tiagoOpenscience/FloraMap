@@ -5,6 +5,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const form = document.getElementById("form-novo-projeto");
   const inputNome = document.getElementById("input-nome-projeto");
   const erroEl = document.getElementById("erro-novo-projeto");
+  const botaoSair = document.getElementById("botao-sair");
+
+  botaoSair.addEventListener("click", async () => {
+    await Api.logout();
+    window.location.href = "/login.html";
+  });
 
   function formatarData(isoString) {
     const data = new Date(isoString.replace(" ", "T") + "Z");

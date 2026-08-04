@@ -189,6 +189,39 @@ label:first-child {
   color: var(--cor-texto-suave);
 }
 
+/* ---------- Login ---------- */
+
+.pagina-login {
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.pagina-login__cartao {
+  width: 100%;
+  max-width: 320px;
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  box-shadow: var(--sombra-suave);
+  padding: 28px 24px;
+}
+
+.pagina-login__titulo {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.pagina-login__subtitulo {
+  color: var(--cor-texto-suave);
+  margin: 4px 0 22px;
+  font-size: 13px;
+}
+
 /* ---------- Tela do Projeto ---------- */
 
 .app {
@@ -329,6 +362,131 @@ label:first-child {
   stroke-width: 2;
   stroke-dasharray: 6 4;
   pointer-events: none;
+}
+
+.marcador-acesso {
+  stroke: #ffffff;
+  stroke-width: 2;
+  cursor: pointer;
+}
+
+.marcador-acesso--entrada {
+  fill: var(--cor-primaria);
+}
+
+.marcador-acesso--saida {
+  fill: var(--cor-perigo);
+}
+
+.botao-acesso {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.botao-acesso::before {
+  content: "";
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.botao-acesso--entrada::before {
+  background: var(--cor-primaria);
+}
+
+.botao-acesso--saida::before {
+  background: var(--cor-perigo);
+}
+
+.legenda-acessos {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  padding: 8px 12px;
+  box-shadow: var(--sombra-suave);
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 5;
+}
+
+.legenda-acessos[hidden] {
+  display: none;
+}
+
+.legenda-acessos__item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legenda-acessos__ponto {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.legenda-acessos__ponto--entrada {
+  background: var(--cor-primaria);
+}
+
+.legenda-acessos__ponto--saida {
+  background: var(--cor-perigo);
+}
+
+.legenda-variedades {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  padding: 8px 12px;
+  box-shadow: var(--sombra-suave);
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 5;
+  max-width: 200px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.legenda-variedades[hidden] {
+  display: none;
+}
+
+.legenda-variedades__titulo {
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+
+.legenda-variedades__item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legenda-variedades__cor {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.legenda-variedades__nome {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sidebar {

@@ -18,7 +18,16 @@ from typing import Any
 from fpdf import FPDF
 from PIL import Image, ImageDraw
 
-from backend.servicos import estufa_servico, projeto_servico, resumo_servico, variedade_servico
+from backend.servicos import (
+    estufa_servico,
+    ponto_acesso_servico,
+    projeto_servico,
+    resumo_servico,
+    variedade_servico,
+)
+
+COR_ENTRADA = (47, 111, 78)  # mesmo verde de --cor-primaria
+COR_SAIDA = (179, 69, 58)  # mesmo vermelho de --cor-perigo
 
 LARGURA_MAXIMA_IMAGEM_PDF = 1800  # px — evita PDFs enormes com fotos muito grandes
 
@@ -79,6 +88,7 @@ def gerar_pdf(projeto_id: int) -> bytes:
     estufas = estufa_servico.listar_estufas(projeto_id)
     resumo = resumo_servico.obter_resumo(projeto_id)
     variedades = variedade_servico.listar_variedades()
+    pontos_acesso = ponto_acesso_servico.listar_pontos_acesso(projeto_id)
 
     pdf = FPDF(orientation="P", unit="mm", format="A4")
     pdf.set_auto_page_break(auto=True, margin=15)
@@ -100,7 +110,7 @@ def gerar_pdf(projeto_id: int) -> bytes:
         nome_arquivo = Path(projeto["imagem_path"]).name
         caminho_absoluto = projeto_servico.UPLOADS_DIR / nome_arquivo
         if caminho_absoluto.exists():
-            imagem_mapa, rotulos = _gerar_imagem_mapa(str(caminho_absoluto), estufas)
+            imagem_mapa, rotulos = _gerar_imagem_mapa(str(caminho_absoluto), estufas, pontos_acesso)
             largura_disponivel = pdf.w - 2 * pdf.l_margin
             x_imagem, y_imagem = pdf.l_margin, pdf.get_y()
             pdf.image(imagem_mapa, x=x_imagem, y=y_imagem, w=largura_disponivel)
@@ -118,6 +128,7 @@ def gerar_pdf(projeto_id: int) -> bytes:
 
     _secao_resumo(pdf, resumo)
     _secao_legenda_variedades(pdf, variedades)
+    _secao_legenda_acessos(pdf, pontos_acesso)
     _secao_tabela_areas(pdf, estufas)
     _secao_texto(pdf, "Observações", projeto.get("observacao"))
     _secao_texto(pdf, "Análise Geral", projeto.get("analise_geral"))
@@ -149,6 +160,25 @@ def _secao_legenda_variedades(pdf: FPDF, variedades: list[dict[str, Any]]) -> No
         pdf.set_fill_color(r, g, b)
         pdf.cell(6, 6, "", border=1, fill=True)
         pdf.cell(0, 6, f"  {_texto_seguro(variedade['nome'])}", new_x="LMARGIN", new_y="NEXT")
+
+    pdf.ln(3)
+
+
+def _secao_legenda_acessos(pdf: FPDF, pontos_acesso: list[dict[str, Any]]) -> None:
+    if not pontos_acesso:
+        return
+
+    pdf.set_font("Helvetica", "B", 13)
+    pdf.cell(0, 8, "Legenda de Acessos", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_font("Helvetica", "", 10)
+
+    pdf.set_fill_color(*COR_ENTRADA)
+    pdf.cell(6, 6, "", border=1, fill=True)
+    pdf.cell(0, 6, "  Entrada", new_x="LMARGIN", new_y="NEXT")
+
+    pdf.set_fill_color(*COR_SAIDA)
+    pdf.cell(6, 6, "", border=1, fill=True)
+    pdf.cell(0, 6, "  Saída", new_x="LMARGIN", new_y="NEXT")
 
     pdf.ln(3)
 
@@ -261,7 +291,9 @@ def _desenhar_rotulos_vetoriais(
 
 
 def _gerar_imagem_mapa(
-    caminho_imagem: str, estufas: list[dict[str, Any]]
+    caminho_imagem: str,
+    estufas: list[dict[str, Any]],
+    pontos_acesso: list[dict[str, Any]] | None = None,
 ) -> tuple[Image.Image, list[dict[str, Any]]]:
     base = Image.open(caminho_imagem).convert("RGBA")
 
@@ -295,6 +327,18 @@ def _gerar_imagem_mapa(
             else:
                 cor = cor_neutra
             draw_overlay.polygon(pontos_area, fill=cor, outline=(255, 255, 255, 255), width=espessura_area)
+
+    raio_acesso = max(4, 5 * escala)
+    for ponto in pontos_acesso or []:
+        cor = (*(COR_ENTRADA if ponto["tipo"] == "entrada" else COR_SAIDA), 255)
+        cx = ponto["x"] * fator_render
+        cy = ponto["y"] * fator_render
+        draw_overlay.ellipse(
+            (cx - raio_acesso, cy - raio_acesso, cx + raio_acesso, cy + raio_acesso),
+            fill=cor,
+            outline=(255, 255, 255, 255),
+            width=max(1, espessura_area),
+        )
 
     composta = Image.alpha_composite(base, overlay).convert("RGB")
 

@@ -104,16 +104,18 @@ Backend (`backend/`):
 - `banco.py` — conexão SQLite + migrações
 - `schema.sql`
 - `detector/detector.py` — detecção automática de estufas
-- `rotas/` — blueprints: `projetos`, `estufas`, `areas`, `variedades`, `exportacao`
-- `servicos/` — regras de negócio: `projeto_servico`, `estufa_servico`, `area_servico`, `variedade_servico`, `resumo_servico`, `exportacao_servico`, `geometria`
+- `rotas/` — blueprints: `projetos`, `estufas`, `areas`, `variedades`, `exportacao`, `pontos_acesso`, `auth`
+- `servicos/` — regras de negócio: `projeto_servico`, `estufa_servico`, `area_servico`, `variedade_servico`, `resumo_servico`, `exportacao_servico`, `geometria`, `ponto_acesso_servico`
 
 Frontend (`frontend/`):
 
 - `index.html` — Home (listar/criar/renomear/excluir projeto)
 - `projeto.html` — tela principal (SPA)
+- `login.html` — tela de senha única compartilhada
 - `css/style.css`
 - `js/api.js` — única camada que chama `fetch()`; nenhum outro módulo deve chamar `fetch()` diretamente
 - `js/home.js` — comportamento da Home
+- `js/login.js` — comportamento da tela de login
 - `js/mapa.js` — renderização SVG (estufas, áreas, rótulos) + modos interativos (amostra de cor, desenho manual)
 - `js/sidebar.js` — painel lateral: Visão Geral (padrão), Estufa, Área
 - `js/variedades.js` — modal de Variedades
