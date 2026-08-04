@@ -50,7 +50,7 @@ Também gere uma chave de sessão aleatória (qualquer string longa e única ser
 No dashboard do PythonAnywhere, abra um **Bash console** (menu "Consoles" → "Bash") e rode:
 
 ```
-git clone https://github.com/LittleTiago/FloraMap.git
+git clone https://github.com/tiagoOpenscience/FloraMap.git
 ```
 
 ## Passo 5 — Instalar as dependências
