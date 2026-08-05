@@ -54,6 +54,25 @@ const Mapa = (() => {
     return [poligono[indice], poligono[(indice + 1) % poligono.length]];
   }
 
+  // Ângulo "de leitura" (nunca de cabeça para baixo) da maior aresta do
+  // polígono — usado como orientação do título da estufa, já que
+  // estufas costumam ser alongadas e a maior aresta acompanha o sentido
+  // real da estrutura na foto.
+  function _anguloOrientacaoEstufa(poligono) {
+    let melhorIndice = 0;
+    let melhorComprimento = -1;
+    for (let indice = 0; indice < poligono.length; indice++) {
+      const [p1, p2] = _pontosDaAresta(poligono, indice);
+      const comprimento = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+      if (comprimento > melhorComprimento) {
+        melhorComprimento = comprimento;
+        melhorIndice = indice;
+      }
+    }
+    const [p1, p2] = _pontosDaAresta(poligono, melhorIndice);
+    return _anguloLegivel(p1, p2);
+  }
+
   function _desenharArea(ns, grupo, area, estufa) {
     const poligono = document.createElementNS(ns, "polygon");
     poligono.setAttribute("points", _pontosParaAtributo(area.poligono));
@@ -100,6 +119,8 @@ const Mapa = (() => {
       rotulo.setAttribute("x", centro.x);
       rotulo.setAttribute("y", centro.y);
       rotulo.setAttribute("text-anchor", "middle");
+      const angulo = _anguloOrientacaoEstufa(estufa.poligono);
+      rotulo.setAttribute("transform", `rotate(${angulo}, ${centro.x}, ${centro.y})`);
       rotulo.setAttribute("class", "rotulo-estufa");
       rotulo.dataset.estufaId = estufa.id;
       rotulo.textContent = _textoRotulo(estufa);

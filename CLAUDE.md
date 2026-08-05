@@ -69,7 +69,8 @@ Toda estufa e toda área são representadas por um polígono SVG. Nunca usar Can
 
 Rótulos no mapa:
 
-- Estufa: mostra só o **nome** (sem o número), **sempre**, tenha ou não áreas geradas — é o único texto visível dentro da estufa, para o usuário sempre saber qual estufa é qual só olhando o mapa. O número continua existindo como campo (editável no painel, usado nas tabelas do PDF/CSV), só não aparece mais no rótulo do mapa.
+- Estufa: mostra só o **nome** (sem o número), **sempre**, tenha ou não áreas geradas — é o único texto visível dentro da estufa, para o usuário sempre saber qual estufa é qual só olhando o mapa. O número continua existindo como campo (editável no painel, usado nas tabelas do PDF/CSV), só não aparece mais no rótulo do mapa. O rótulo é rotacionado pra acompanhar a orientação real da estufa (ângulo da maior aresta do contorno), igual ao rótulo de entrada/saída — nunca fica de cabeça para baixo.
+- Todo texto do mapa (título de estufa, entrada/saída) usa contorno **preto** ao redor das letras pra legibilidade sobre a foto (nunca branco).
 - Área: **não mostra nenhum texto** — só a cor (da variedade, ou neutra se nenhuma). Os detalhes (`A{ordem}`, canteiros/vãos/postinhos, variedade) ficam só no painel lateral, ao clicar na área.
 
 ---

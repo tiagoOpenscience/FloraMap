@@ -244,6 +244,34 @@ def _centro(poligono: list[dict[str, float]]) -> tuple[float, float]:
     return x, y
 
 
+def _angulo_legivel(p1: dict[str, float], p2: dict[str, float]) -> float:
+    """Ângulo (graus) da aresta p1→p2, corrigido pra nunca ficar de
+    cabeça para baixo (texto sempre legível da esquerda pra direita)."""
+    angulo = math.degrees(math.atan2(p2["y"] - p1["y"], p2["x"] - p1["x"]))
+    if angulo > 90 or angulo < -90:
+        angulo += 180
+    return angulo
+
+
+def _angulo_orientacao_estufa(poligono: list[dict[str, float]]) -> float:
+    """Ângulo de leitura da maior aresta do polígono — usado como
+    orientação do título da estufa, igual ao mapa interativo (estufas
+    costumam ser alongadas, e a maior aresta acompanha o sentido real
+    da estrutura na foto)."""
+    melhor_indice = 0
+    melhor_comprimento = -1.0
+    for indice in range(len(poligono)):
+        p1 = poligono[indice]
+        p2 = poligono[(indice + 1) % len(poligono)]
+        comprimento = math.hypot(p2["x"] - p1["x"], p2["y"] - p1["y"])
+        if comprimento > melhor_comprimento:
+            melhor_comprimento = comprimento
+            melhor_indice = indice
+    p1 = poligono[melhor_indice]
+    p2 = poligono[(melhor_indice + 1) % len(poligono)]
+    return _angulo_legivel(p1, p2)
+
+
 def _desenhar_rotulos_vetoriais(
     pdf: FPDF,
     rotulos: list[dict[str, Any]],
@@ -259,9 +287,9 @@ def _desenhar_rotulos_vetoriais(
     Ao contrário de texto desenhado com Pillow dentro de um bitmap, texto
     vetorial do fpdf2 continua nítido em qualquer nível de zoom no leitor
     de PDF. Para legibilidade sobre a foto, em vez de uma caixa de fundo
-    (que ficava com aspecto de "blocão" branco), o texto é desenhado com
-    contorno branco ao redor das letras — a mesma técnica usada no SVG do
-    mapa no navegador (`paint-order: stroke` + `stroke` branco em
+    (que ficava com aspecto de "blocão"), o texto é desenhado com contorno
+    preto ao redor das letras — a mesma técnica usada no SVG do mapa no
+    navegador (`paint-order: stroke` + `stroke` preto em
     `frontend/css/style.css`).
     """
     largura_linha_original = pdf.line_width
@@ -274,7 +302,7 @@ def _desenhar_rotulos_vetoriais(
         pdf.set_font("Helvetica", "B", tamanho_pt)
         pdf.set_line_width(tamanho_pt * 0.35276 * 0.18)  # contorno proporcional ao tamanho da fonte
         pdf.set_text_color(*rotulo.get("cor_rgb", (25, 35, 20)))
-        pdf.set_draw_color(*rotulo.get("cor_contorno_rgb", (255, 255, 255)))
+        pdf.set_draw_color(*rotulo.get("cor_contorno_rgb", (0, 0, 0)))
 
         linhas = [_texto_seguro(linha) for linha in rotulo["linhas"]]
         altura_linha = tamanho_pt * 0.4
@@ -389,7 +417,9 @@ def _gerar_imagem_mapa(
     for estufa in estufas:
         # O título da estufa fica sempre centralizado no polígono, igual
         # ao mapa interativo — as áreas não têm mais texto próprio (só
-        # cor), então não há mais risco de sobreposição.
+        # cor), então não há mais risco de sobreposição. Gira pra
+        # acompanhar a orientação real da estufa na foto (maior aresta),
+        # igual ao rótulo de entrada/saída.
         cx, cy = _centro(estufa["poligono"])
         centro_estufa = (cx * fator_render, cy * fator_render)
         rotulos.append(
@@ -397,6 +427,7 @@ def _gerar_imagem_mapa(
                 "centro_frac": (centro_estufa[0] / largura_final, centro_estufa[1] / altura_final),
                 "linhas": [estufa["nome"]],
                 "tamanho_fonte_px": tamanho_fonte_estufa,
+                "angulo_graus": _angulo_orientacao_estufa(estufa["poligono"]),
             }
         )
 

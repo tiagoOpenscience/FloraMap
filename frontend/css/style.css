@@ -328,8 +328,8 @@ label:first-child {
   fill: var(--cor-primaria-escura);
   cursor: pointer;
   paint-order: stroke;
-  stroke: #ffffff;
-  stroke-width: 3px;
+  stroke: #000000;
+  stroke-width: 2px;
   stroke-linejoin: round;
 }
 
