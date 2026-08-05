@@ -30,8 +30,6 @@ from backend.servicos import (
 
 COR_ENTRADA = (47, 111, 78)  # mesmo verde de --cor-primaria
 COR_SAIDA = (179, 69, 58)  # mesmo vermelho de --cor-perigo
-COR_ENTRADA_TEXTO = (35, 79, 56)  # mesmo verde de --cor-primaria-escura (contraste do rótulo)
-COR_SAIDA_TEXTO = (122, 46, 38)  # variante escura de --cor-perigo (contraste do rótulo)
 
 LARGURA_MAXIMA_IMAGEM_PDF = 1800  # px — evita PDFs enormes com fotos muito grandes
 
@@ -352,7 +350,7 @@ def _gerar_imagem_mapa(
     rotulos: list[dict[str, Any]] = []
 
     estufas_por_id = {estufa["id"]: estufa for estufa in estufas}
-    espessura_acesso = max(8, 6 * escala)
+    espessura_acesso = max(14, 11 * escala)
     for ponto in pontos_acesso or []:
         estufa = estufas_por_id.get(ponto["estufa_id"])
         if estufa is None:
@@ -381,7 +379,7 @@ def _gerar_imagem_mapa(
                 "linhas": ["Entrada" if entrada else "Saída"],
                 "tamanho_fonte_px": tamanho_fonte_acesso,
                 "angulo_graus": angulo,
-                "cor_rgb": COR_ENTRADA_TEXTO if entrada else COR_SAIDA_TEXTO,
+                "cor_rgb": (0, 0, 0),
                 "cor_contorno_rgb": (0, 0, 0),
             }
         )
