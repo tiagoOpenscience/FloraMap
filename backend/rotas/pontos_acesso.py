@@ -1,4 +1,4 @@
-"""Rotas da API relacionadas a Ponto de Acesso (entrada/saída da propriedade)."""
+"""Rotas da API relacionadas a Ponto de Acesso (entrada/saída, por aresta de estufa)."""
 
 from __future__ import annotations
 
@@ -11,19 +11,18 @@ from backend.servicos import ponto_acesso_servico
 bp = Blueprint("pontos_acesso", __name__, url_prefix="/api")
 
 
-@bp.post("/projetos/<int:projeto_id>/pontos-acesso")
-def criar(projeto_id: int) -> Any:
+@bp.post("/estufas/<int:estufa_id>/pontos-acesso")
+def criar(estufa_id: int) -> Any:
     dados = request.get_json(silent=True) or {}
     tipo = dados.get("tipo")
 
     try:
-        x = float(dados.get("x"))
-        y = float(dados.get("y"))
+        indice_aresta = int(dados.get("indice_aresta"))
     except (TypeError, ValueError):
-        return jsonify({"erro": "Coordenadas inválidas."}), 400
+        return jsonify({"erro": "Índice de aresta inválido."}), 400
 
     try:
-        ponto = ponto_acesso_servico.criar_ponto_acesso(projeto_id, tipo, x, y)
+        ponto = ponto_acesso_servico.criar_ponto_acesso(estufa_id, tipo, indice_aresta)
     except LookupError as erro:
         return jsonify({"erro": str(erro)}), 404
     except ValueError as erro:

@@ -120,6 +120,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   async function selecionarEstufa(estufa) {
+    limparSelecaoAcesso();
     Mapa.marcarEstufaSelecionada(estufa.id);
     Sidebar.mostrarEstufa(estufa, {
       aoVoltarGeral: mostrarVisaoGeral,
@@ -154,6 +155,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   async function selecionarArea(area, estufa) {
+    limparSelecaoAcesso();
     Mapa.marcarAreaSelecionada(area.id);
     const variedades = await Api.listarVariedades();
     Sidebar.mostrarArea(area, estufa, {
@@ -162,7 +164,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       aoAtualizar: async (areaId, campos) => {
         const atualizada = await Api.atualizarArea(areaId, campos);
         Mapa.atualizarCorArea(areaId, atualizada.variedade_cor);
-        Mapa.atualizarRotuloArea(areaId, atualizada);
         Object.assign(area, atualizada);
         atualizarLegendaVariedades();
         return atualizada;
@@ -185,14 +186,29 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  async function excluirPontoAcesso(ponto) {
-    const rotulo = ponto.tipo === "entrada" ? "entrada" : "saída";
-    const confirmado = confirm(`Remover esta marcação de ${rotulo}?`);
-    if (!confirmado) return;
+  // Seleciona uma aresta de entrada/saída já marcada (clique nela) —
+  // a remoção de verdade acontece com a tecla Delete/Backspace, mais
+  // abaixo, igual a uma ferramenta de desenho.
+  let acessoSelecionado = null; // { id, tipo }
+
+  function limparSelecaoAcesso() {
+    acessoSelecionado = null;
+    Mapa.selecionarArestaAcesso(null);
+  }
+
+  function selecionarAcesso(ponto) {
+    acessoSelecionado = ponto;
+    Mapa.selecionarArestaAcesso(ponto.id);
+  }
+
+  async function excluirAcessoSelecionado() {
+    if (!acessoSelecionado) return;
+    const ponto = acessoSelecionado;
+    limparSelecaoAcesso();
 
     try {
       await Api.excluirPontoAcesso(ponto.id);
-      Mapa.removerMarcadorAcesso(ponto.id);
+      Mapa.removerArestaAcesso(ponto.id);
       if (projetoAtual) {
         projetoAtual.pontos_acesso = (projetoAtual.pontos_acesso || []).filter(
           (p) => p.id !== ponto.id
@@ -203,6 +219,18 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
+  document.addEventListener("keydown", (evento) => {
+    if (evento.key !== "Delete" && evento.key !== "Backspace") return;
+    if (!acessoSelecionado) return;
+
+    const alvo = evento.target;
+    const ehCampoDeTexto = alvo && (alvo.tagName === "INPUT" || alvo.tagName === "TEXTAREA");
+    if (ehCampoDeTexto) return;
+
+    evento.preventDefault();
+    excluirAcessoSelecionado();
+  });
+
   Mapa.iniciar({
     vazio: document.getElementById("mapa-vazio"),
     palco: document.getElementById("mapa-palco"),
@@ -210,7 +238,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     svg: document.getElementById("mapa-svg"),
     aoSelecionarEstufa: selecionarEstufa,
     aoSelecionarArea: selecionarArea,
-    aoClicarAcesso: excluirPontoAcesso,
+    aoClicarAcesso: selecionarAcesso,
   });
 
   Sidebar.iniciar({
@@ -389,22 +417,23 @@ document.addEventListener("DOMContentLoaded", async () => {
     };
   });
 
-  // ---------- Modo de posicionar entrada/saída (marcador único) ----------
+  // ---------- Modo de escolher a aresta de entrada/saída ----------
 
   function ativarModoAcesso(tipo, rotulo) {
     if (!projetoAtual?.imagem_path) return;
+    limparSelecaoAcesso();
 
-    textoBanner.textContent = `Clique no mapa para marcar a ${rotulo}.`;
+    textoBanner.textContent = `Clique numa borda de estufa para marcar a ${rotulo}.`;
     botaoConcluirAmostra.hidden = true;
     bannerAmostra.hidden = false;
 
-    finalizarModoAtual = Mapa.iniciarModoPonto(async (x, y) => {
+    finalizarModoAtual = Mapa.iniciarModoAresta(projetoAtual.estufas || [], async (estufaId, indiceAresta) => {
       _encerrarBanner();
       try {
-        const ponto = await Api.criarPontoAcesso(projetoId, tipo, x, y);
+        const ponto = await Api.criarPontoAcesso(estufaId, tipo, indiceAresta);
         projetoAtual.pontos_acesso = projetoAtual.pontos_acesso || [];
         projetoAtual.pontos_acesso.push(ponto);
-        Mapa.adicionarMarcadorAcesso(ponto);
+        Mapa.adicionarArestaAcesso(ponto, encontrarEstufa(estufaId));
       } catch (erro) {
         alert(erro.message);
       }

@@ -17,7 +17,7 @@ Orientar o funcionário, passo a passo, sobre como usar o FloraMap para:
 - criar um projeto de uma propriedade;
 - mapear as estufas a partir de uma imagem aérea;
 - dividir cada estufa em áreas de cultivo e preencher seus dados;
-- marcar os pontos de entrada e saída da propriedade;
+- marcar a entrada e a saída de cada estufa;
 - exportar o resultado em PDF e CSV.
 
 ## 2. Antes de Começar
@@ -103,12 +103,12 @@ Se você excluiu uma estufa/área, dividiu uma estufa ou rodou a detecção por 
 3. Clique em **Adicionar**.
 4. A variedade passa a aparecer na lista de seleção de qualquer área, em qualquer projeto.
 
-### 3.9 Marcar a entrada e a saída da propriedade
+### 3.9 Marcar a entrada e a saída de uma estufa
 
-1. Clique em **Adicionar entrada** e depois clique no ponto do mapa onde fica a entrada — um marcador **verde** aparece nesse local.
-2. Clique em **Adicionar saída** e depois clique no ponto do mapa onde fica a saída — um marcador **vermelho** aparece nesse local.
+1. Clique em **Adicionar entrada** e depois clique numa das bordas da estufa — aquela borda fica mais grossa e **verde**, marcando a entrada.
+2. Clique em **Adicionar saída** e depois clique noutra borda — ela fica mais grossa e **vermelha**, marcando a saída.
 3. A legenda no canto inferior esquerdo do mapa sempre mostra o que cada cor significa.
-4. Para remover um marcador colocado errado, clique nele e confirme a exclusão.
+4. Para remover uma marcação colocada errado: clique na borda marcada (ela fica com um contorno tracejado, indicando que foi selecionada) e pressione a tecla **Delete** (ou **Backspace**) do teclado.
 
 > No canto inferior direito do mapa aparece outra legenda, com a cor e o nome de cada variedade já usada em alguma área do projeto — ela é preenchida automaticamente, sem nenhuma ação extra.
 
@@ -127,8 +127,8 @@ Na tela de **Visão Geral**:
 ## 4. Pontos de Atenção
 
 - Rodar **Detectar estufas** novamente **substitui** todas as estufas e áreas já cadastradas no projeto. Use com cuidado, e lembre do Ctrl+Z se for engano.
-- Excluir uma estufa remove também todas as áreas dela. O sistema sempre pede confirmação antes.
-- Excluir um projeto (na tela inicial) remove também suas estufas, áreas, imagem e marcadores de entrada/saída — não tem volta.
+- Excluir uma estufa remove também todas as áreas dela e suas marcações de entrada/saída. O sistema sempre pede confirmação antes.
+- Excluir um projeto (na tela inicial) remove também suas estufas, áreas, imagem e marcações de entrada/saída — não tem volta.
 - O sistema é de uso interno da Cooperflora; não há login por usuário nem histórico de quem alterou o quê.
 
 ## 5. Responsabilidades

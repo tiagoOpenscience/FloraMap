@@ -322,22 +322,6 @@ label:first-child {
   stroke-width: 2.5;
 }
 
-.rotulo-area {
-  font-size: 10px;
-  fill: #1f2b1c;
-  pointer-events: none;
-  paint-order: stroke;
-  stroke: rgba(255, 255, 255, 0.85);
-  stroke-width: 2.5px;
-  stroke-linejoin: round;
-  text-anchor: middle;
-}
-
-.rotulo-area__titulo {
-  font-weight: 700;
-  font-size: 11px;
-}
-
 .rotulo-estufa {
   font-size: 13px;
   font-weight: 700;
@@ -364,18 +348,34 @@ label:first-child {
   pointer-events: none;
 }
 
-.marcador-acesso {
-  stroke: #ffffff;
-  stroke-width: 2;
+.aresta-selecionavel {
+  stroke: rgba(47, 111, 78, 0.35);
+  stroke-width: 10;
+  stroke-linecap: round;
   cursor: pointer;
 }
 
-.marcador-acesso--entrada {
-  fill: var(--cor-primaria);
+.aresta-selecionavel:hover {
+  stroke: rgba(47, 111, 78, 0.6);
 }
 
-.marcador-acesso--saida {
-  fill: var(--cor-perigo);
+.aresta-acesso {
+  stroke-width: 6;
+  stroke-linecap: round;
+  cursor: pointer;
+}
+
+.aresta-acesso--entrada {
+  stroke: var(--cor-primaria);
+}
+
+.aresta-acesso--saida {
+  stroke: var(--cor-perigo);
+}
+
+.aresta-acesso.selecionada {
+  stroke-width: 9;
+  stroke-dasharray: 3 4;
 }
 
 .botao-acesso {
@@ -427,9 +427,9 @@ label:first-child {
 }
 
 .legenda-acessos__ponto {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
+  width: 16px;
+  height: 4px;
+  border-radius: 2px;
   display: inline-block;
   flex-shrink: 0;
 }

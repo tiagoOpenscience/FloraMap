@@ -89,9 +89,9 @@ Fora do escopo:
 
 ### Ponto de Acesso
 - id
-- projeto_id (FK)
+- estufa_id (FK)
 - tipo (`entrada` | `saida`)
-- x, y (coordenadas no SVG)
+- indice_aresta (posição da aresta na borda da estufa — o segmento entre `poligono[indice_aresta]` e o próximo vértice, com wrap-around; não tem coordenadas próprias, segue o polígono da estufa)
 
 ## 2.2 Relacionamentos
 
@@ -99,7 +99,7 @@ Fora do escopo:
 Projeto (1) ──< Estufa (N) ──< Área (N) >── Variedade (opcional)
 ```
 
-Exclusão em cascata: excluir um Projeto remove suas Estufas e Áreas (e o arquivo de imagem no disco); excluir uma Estufa remove suas Áreas; excluir uma Variedade em uso apenas desvincula as Áreas (`variedade_id` vira `NULL`). Excluir um Projeto também remove seus Pontos de Acesso.
+Exclusão em cascata: excluir um Projeto remove suas Estufas, Áreas e Pontos de Acesso (e o arquivo de imagem no disco); excluir uma Estufa remove suas Áreas e seus Pontos de Acesso; excluir uma Variedade em uso apenas desvincula as Áreas (`variedade_id` vira `NULL`).
 
 ---
 
@@ -131,7 +131,7 @@ Painel da Estufa: número, nome (salvamento automático), quantidade de áreas +
 Informar quantidade e orientação (`auto` — eixo mais longo da estufa; `vertical` — colunas lado a lado; `horizontal` — linhas empilhadas). Se a estufa já tinha áreas, é pedida confirmação (substituem as anteriores). As áreas geradas são sempre recortadas para dentro do contorno real da estufa (nunca "vazam" para fora, mesmo em estufas não perfeitamente retangulares).
 
 ## 3.7 Editar/Excluir Área
-Painel da Área: variedade (seleção), fase/vãos/canteiros/postinhos (texto, salvamento automático), botão "Excluir área" (confirmação; Ctrl+Z desfaz). O rótulo da área no mapa (`A{ordem}`, dimensões, variedade) atualiza em tempo real.
+Painel da Área: variedade (seleção), fase/vãos/canteiros/postinhos (texto, salvamento automático), botão "Excluir área" (confirmação; Ctrl+Z desfaz). A área não tem rótulo de texto no mapa — só a cor da variedade atualiza em tempo real; os demais dados só aparecem no painel.
 
 ## 3.8 Navegação no painel lateral
 A Visão Geral é o estado padrão. Selecionar uma Estufa ou Área muda o painel para o modo de edição correspondente, sempre com um botão "← Visão Geral" no topo. O painel de Área também tem "← Editar Estufa N".
@@ -141,7 +141,9 @@ Funciona em qualquer lugar da tela principal (exceto com foco em campo de texto,
 
 ## 3.10 Marcar Entrada/Saída
 
-Toolbar tem os botões "Adicionar entrada" e "Adicionar saída". Ao clicar em um deles, um banner pede um único clique no mapa; esse clique posiciona um marcador circular (verde para entrada, vermelho para saída) na coordenada clicada e salva automaticamente via API — sem confirmar ou digitar nada. Não há rótulo de texto no mapa ao lado de cada marcador (para não poluir a imagem); uma legenda fixa no canto inferior esquerdo do mapa (visível sempre que há uma imagem carregada) explica que verde é entrada e vermelho é saída. Clicar num marcador já existente pede confirmação e o exclui. Os marcadores também aparecem no PDF exportado, com a mesma legenda.
+Toolbar tem os botões "Adicionar entrada" e "Adicionar saída". Ao clicar em um deles, um banner pede pra clicar numa **aresta da borda de uma estufa** (não um ponto qualquer do mapa): durante esse modo, todas as arestas de todas as estufas ficam destacadas e clicáveis; ao clicar numa, ela vira a entrada/saída marcada — a linha da borda fica mais grossa e colorida (verde para entrada, vermelho para saída) — e salva automaticamente via API, sem confirmar nada. A marcação segue o contorno real da estufa (não é um ponto solto). Não há rótulo de texto no mapa; uma legenda fixa no canto inferior esquerdo do mapa (visível sempre que há uma imagem carregada) explica que verde é entrada e vermelho é saída.
+
+Pra remover uma marcação já existente: clique nela (a linha fica com um contorno tracejado indicando que está selecionada) e pressione **Delete** ou **Backspace** — sem diálogo de confirmação, igual a selecionar e apagar um objeto num editor gráfico. As arestas de entrada/saída também aparecem no PDF exportado, com a mesma legenda.
 
 ## 3.11 Exportar
 Na Visão Geral: "Exportar PDF" (mapa com estufas/áreas desenhadas e rotuladas + legenda de variedades + resumo + tabela + observações/análise) e "Exportar CSV" (tabela: Estufa, Número, Área, Variedade, Fase, Vãos, Canteiros, Postinhos).
@@ -194,7 +196,7 @@ O sistema fica atrás de uma senha única, compartilhada por todo o time (não h
 "Enviar Imagem" · "Detectar estufas" (desabilitado sem imagem) · "Desenhar estufa" (desabilitado sem imagem) · "Adicionar entrada" (desabilitado sem imagem) · "Adicionar saída" (desabilitado sem imagem) · "Variedades" (abre modal) · "Visão Geral" (atalho para o estado padrão do painel).
 
 ### 4.2.2 Mapa
-Imagem aérea de fundo + SVG com um polígono por Estufa e, dentro dela, um polígono por Área (quando geradas). Área colorida pela variedade (ou cor neutra se nenhuma). Clique numa Estufa sem áreas seleciona a Estufa; clique numa Área seleciona a Área. Rótulos: ver seção 5 do `CLAUDE.md` ("Decisões de projeto importantes") e seção 8.4 abaixo. Marcadores de entrada (verde) e saída (vermelho) ficam sobrepostos ao mapa, sem rótulo de texto; uma legenda fixa no canto inferior esquerdo explica as cores (ver seção 3.10). No canto inferior direito, uma segunda legenda lista as variedades em uso no projeto (cor + nome), calculada a partir das áreas já preenchidas — some automaticamente se nenhuma área tem variedade definida.
+Imagem aérea de fundo + SVG com um polígono por Estufa e, dentro dela, um polígono por Área (quando geradas). Área colorida pela variedade (ou cor neutra se nenhuma), sem nenhum texto. O nome/número da estufa fica sempre visível, centralizado nela. Clique numa Estufa (fora de uma área) seleciona a Estufa; clique numa Área seleciona a Área; clique no rótulo da estufa também seleciona a Estufa. Rótulos: ver seção 5 do `CLAUDE.md` ("Decisões de projeto importantes") e seção 8.4 abaixo. Entradas (verde) e saídas (vermelho) são arestas destacadas da borda de uma estufa, sem rótulo de texto; uma legenda fixa no canto inferior esquerdo explica as cores (ver seção 3.10). No canto inferior direito, uma segunda legenda lista as variedades em uso no projeto (cor + nome), calculada a partir das áreas já preenchidas — some automaticamente se nenhuma área tem variedade definida.
 
 ### 4.2.3 Painel Lateral — estados
 
@@ -308,9 +310,9 @@ Todos os endpoints abaixo existem e estão implementados.
 - `POST /api/variedades` `{nome, cor}`
 - `PATCH /api/variedades/{id}` `{nome?, cor?}`
 
-## Pontos de Acesso (entrada/saída)
+## Pontos de Acesso (entrada/saída, por aresta de estufa)
 - lista embutida em `GET /api/projetos/{id}` como `pontos_acesso`
-- `POST /api/projetos/{id}/pontos-acesso` `{tipo: "entrada"|"saida", x, y}` — cria
+- `POST /api/estufas/{id}/pontos-acesso` `{tipo: "entrada"|"saida", indice_aresta}` — cria
 - `DELETE /api/pontos-acesso/{id}` — exclui
 
 ---
@@ -352,10 +354,12 @@ Isso garante que cada parte respeite o contorno real do polígono original, mesm
 2. Projeto com imagem, sem estufas — botões habilitados.
 3. Estufas detectadas/criadas, sem seleção — Visão Geral no painel.
 4. Estufa selecionada, sem áreas — rótulo da estufa visível no mapa; painel de Estufa.
-5. Estufa selecionada, com áreas — rótulo da estufa **oculto** (ver `CLAUDE.md`); áreas visíveis e rotuladas; painel de Estufa alcançável via "← Editar Estufa" a partir de uma Área.
-6. Área selecionada — painel de Área; rótulo com número/dimensões/variedade.
+5. Estufa selecionada, com áreas — rótulo da estufa continua visível (centralizado); áreas visíveis só por cor; painel de Estufa também alcançável via "← Editar Estufa" a partir de uma Área.
+6. Área selecionada — painel de Área com número/dimensões/variedade (o mapa mostra só a cor).
 7. Modo de amostra ativo — banner visível, overlay de clique no mapa, marcador por ponto.
 8. Modo de desenho ativo — banner visível, linha tracejada acompanhando os cliques.
+9. Modo de escolher aresta ativo (entrada/saída) — banner visível, todas as arestas de todas as estufas destacadas e clicáveis.
+10. Aresta de entrada/saída selecionada — linha com contorno tracejado; Delete/Backspace remove.
 
 ## 8.2 Fluxo de Navegação
 SPA de tela única para o projeto; a única transição de página é Home ↔ Tela Principal. Modal de Variedades abre por cima sem perder a seleção atual do mapa.
@@ -380,4 +384,5 @@ SPA de tela única para o projeto; a única transição de página é Home ↔ T
 14. Nunca usar frameworks frontend.
 15. Desfazer (Ctrl+Z) cobre apenas ações estruturais destrutivas (detectar, gerar áreas, dividir, excluir estufa/área) — não cobre edições de campo isoladas, e não há refazer (redo).
 16. Áreas geradas nunca ultrapassam o contorno real da Estufa (recorte via máscara, não bounding box).
-17. O rótulo de uma Estufa no mapa só aparece enquanto ela não tem Áreas geradas.
+17. O rótulo de uma Estufa no mapa fica sempre visível; Áreas nunca têm rótulo de texto no mapa, só cor.
+18. Um Ponto de Acesso é uma aresta da borda de uma Estufa (não um ponto solto) — é removido excluindo a Estufa, ou individualmente selecionando a aresta no mapa e pressionando Delete/Backspace (sem confirmação).

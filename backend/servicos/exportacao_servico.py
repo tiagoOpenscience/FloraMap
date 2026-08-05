@@ -328,16 +328,23 @@ def _gerar_imagem_mapa(
                 cor = cor_neutra
             draw_overlay.polygon(pontos_area, fill=cor, outline=(255, 255, 255, 255), width=espessura_area)
 
-    raio_acesso = max(4, 5 * escala)
+    estufas_por_id = {estufa["id"]: estufa for estufa in estufas}
+    espessura_acesso = max(5, 4 * escala)
     for ponto in pontos_acesso or []:
+        estufa = estufas_por_id.get(ponto["estufa_id"])
+        if estufa is None:
+            continue
+        poligono = estufa["poligono"]
+        p1 = poligono[ponto["indice_aresta"]]
+        p2 = poligono[(ponto["indice_aresta"] + 1) % len(poligono)]
         cor = (*(COR_ENTRADA if ponto["tipo"] == "entrada" else COR_SAIDA), 255)
-        cx = ponto["x"] * fator_render
-        cy = ponto["y"] * fator_render
-        draw_overlay.ellipse(
-            (cx - raio_acesso, cy - raio_acesso, cx + raio_acesso, cy + raio_acesso),
+        draw_overlay.line(
+            [
+                (p1["x"] * fator_render, p1["y"] * fator_render),
+                (p2["x"] * fator_render, p2["y"] * fator_render),
+            ],
             fill=cor,
-            outline=(255, 255, 255, 255),
-            width=max(1, espessura_area),
+            width=espessura_acesso,
         )
 
     composta = Image.alpha_composite(base, overlay).convert("RGB")
@@ -348,22 +355,17 @@ def _gerar_imagem_mapa(
     # ao redor das letras para legibilidade (em vez de uma caixa de
     # fundo), continuando nítido em qualquer nível de zoom.
     tamanho_fonte_estufa = max(14, 16 * escala)
-    tamanho_fonte_area = max(10, 11 * escala)
 
     rotulos: list[dict[str, Any]] = []
     largura_final = base.width
     altura_final = base.height
 
     for estufa in estufas:
-        # O título da estufa fica sempre ACIMA do polígono (nunca no meio),
-        # para nunca sobrepor os rótulos das áreas dela — que ficam dentro
-        # das suas próprias caixas, como antes.
-        cx, _ = _centro(estufa["poligono"])
-        y_topo = min(p["y"] for p in estufa["poligono"])
-        centro_estufa = (
-            cx * fator_render,
-            y_topo * fator_render - tamanho_fonte_estufa * 1.1,
-        )
+        # O título da estufa fica sempre centralizado no polígono, igual
+        # ao mapa interativo — as áreas não têm mais texto próprio (só
+        # cor), então não há mais risco de sobreposição.
+        cx, cy = _centro(estufa["poligono"])
+        centro_estufa = (cx * fator_render, cy * fator_render)
         rotulos.append(
             {
                 "centro_frac": (centro_estufa[0] / largura_final, centro_estufa[1] / altura_final),
@@ -371,21 +373,6 @@ def _gerar_imagem_mapa(
                 "tamanho_fonte_px": tamanho_fonte_estufa,
             }
         )
-
-        for area in estufa.get("areas") or []:
-            cx, cy = _centro(area["poligono"])
-            centro_area = (cx * fator_render, cy * fator_render)
-            rotulos.append(
-                {
-                    "centro_frac": (centro_area[0] / largura_final, centro_area[1] / altura_final),
-                    "linhas": [
-                        f"A{area['ordem']}",
-                        f"{area.get('canteiros') or '-'}x{area.get('vaos') or '-'}x{area.get('postinhos') or '-'}",
-                        area.get("variedade_nome") or "Sem variedade",
-                    ],
-                    "tamanho_fonte_px": tamanho_fonte_area,
-                }
-            )
 
     if composta.width > LARGURA_MAXIMA_IMAGEM_PDF:
         proporcao = LARGURA_MAXIMA_IMAGEM_PDF / composta.width

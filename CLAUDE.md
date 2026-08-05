@@ -69,8 +69,8 @@ Toda estufa e toda área são representadas por um polígono SVG. Nunca usar Can
 
 Rótulos no mapa:
 
-- Estufa: mostra `"{numero} · {nome}"`, mas **só quando ela ainda não tem áreas geradas** — depois de gerar áreas, o rótulo da estufa é omitido de propósito (ver "Decisões de projeto importantes" sobre por quê) e o caminho para reabrir o painel da estufa passa a ser o botão "← Editar Estufa" dentro do painel de uma Área dela.
-- Área: mostra três linhas — `"A{ordem}"`, `"{canteiros}x{vaos}x{postinhos}"`, nome da variedade (ou "Sem variedade") — atualizadas em tempo real conforme os campos são editados.
+- Estufa: mostra `"{numero} · {nome}"`, **sempre**, tenha ou não áreas geradas — é o único texto visível dentro da estufa, para o usuário sempre saber qual estufa é qual só olhando o mapa.
+- Área: **não mostra nenhum texto** — só a cor (da variedade, ou neutra se nenhuma). Os detalhes (`A{ordem}`, canteiros/vãos/postinhos, variedade) ficam só no painel lateral, ao clicar na área.
 
 ---
 
@@ -136,7 +136,7 @@ Estas decisões vieram de problemas reais encontrados durante o desenvolvimento 
 
 **Detector filtra por forma (solidez) e separa blobs fundidos (watershed).** A máscara de cor sozinha não distingue uma estufa (retangular, convexa) de uma mancha de vegetação/árvore (irregular, lobulada) com brilho parecido — por isso todo contorno candidato passa por um filtro de solidez (`área / área do fecho convexo`) antes de virar estufa. Além disso, o fechamento morfológico antigo (kernel 7×7, 3 iterações) chegava a colar estufas vizinhas numa única máscara; o fechamento atual é bem mais conservador (3×3, 1 iteração), e qualquer contorno que ainda assim fique anormalmente grande é testado com uma separação via `watershed` (núcleos pela transformada de distância) antes de aceitá-lo como uma única estufa. Ver `SPEC.md` seção 7.1 para os passos completos.
 
-**Rótulo da estufa só aparece quando ela não tem áreas.** Antes disso, o rótulo (posicionado no centro da estufa) às vezes caía visualmente em cima de uma área específica depois de gerar áreas, bloqueando o clique nela. Em vez de tentar um posicionamento mais esperto, a solução foi mais simples: esconder o rótulo da estufa quando há áreas, e usar o botão "← Editar Estufa" (dentro do painel de qualquer Área dela) como o caminho garantido de volta.
+**Rótulo da estufa sempre visível; áreas não têm mais texto próprio.** A primeira versão escondia o rótulo da estufa quando ela já tinha áreas, porque ele podia cair visualmente em cima do rótulo de alguma área (três linhas: `A{ordem}`, dimensões, variedade) e bloquear o clique nela. A versão atual resolve isso na raiz: áreas não mostram mais nenhum texto no mapa (só a cor), então o rótulo da estufa pode ficar sempre visível sem colidir com nada. Os detalhes de uma área só aparecem ao clicar nela (painel lateral) — o botão "← Editar Estufa" continua existindo no painel de Área como atalho, mas agora clicar direto no rótulo da estufa no mapa também funciona.
 
 **Desfazer (Ctrl+Z) cobre apenas mudanças estruturais**, não edições de campo isoladas (nome, fase, etc.): detectar, gerar áreas, dividir estufa, excluir estufa, excluir área. O mecanismo é simples de propósito — o frontend guarda uma cópia de `estufas` (com áreas aninhadas) antes da ação destrutiva, e Ctrl+Z manda essa cópia de volta para `POST /api/projetos/{id}/estufas/restaurar`, que apaga as estufas atuais do projeto e recria a partir da cópia (os IDs mudam, os dados não).
 

@@ -44,16 +44,19 @@ CREATE TABLE IF NOT EXISTS area (
     FOREIGN KEY (variedade_id) REFERENCES variedade (id) ON DELETE SET NULL
 );
 
+-- Um ponto de acesso é uma aresta da borda de uma Estufa (o segmento
+-- entre poligono[indice_aresta] e poligono[(indice_aresta+1) % N]),
+-- marcada como entrada ou saída. Não tem coordenadas próprias — segue
+-- o polígono da estufa automaticamente.
 CREATE TABLE IF NOT EXISTS ponto_acesso (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    projeto_id INTEGER NOT NULL,
+    estufa_id INTEGER NOT NULL,
     tipo TEXT NOT NULL CHECK (tipo IN ('entrada', 'saida')),
-    x REAL NOT NULL,
-    y REAL NOT NULL,
+    indice_aresta INTEGER NOT NULL,
     criado_em TEXT NOT NULL DEFAULT (datetime('now')),
-    FOREIGN KEY (projeto_id) REFERENCES projeto (id) ON DELETE CASCADE
+    FOREIGN KEY (estufa_id) REFERENCES estufa (id) ON DELETE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS idx_estufa_projeto ON estufa (projeto_id);
 CREATE INDEX IF NOT EXISTS idx_area_estufa ON area (estufa_id);
-CREATE INDEX IF NOT EXISTS idx_ponto_acesso_projeto ON ponto_acesso (projeto_id);
+CREATE INDEX IF NOT EXISTS idx_ponto_acesso_estufa ON ponto_acesso (estufa_id);

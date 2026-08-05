@@ -154,11 +154,11 @@ const Api = {
     return Api._tratarResposta(resp);
   },
 
-  async criarPontoAcesso(projetoId, tipo, x, y) {
-    const resp = await fetch(`/api/projetos/${projetoId}/pontos-acesso`, {
+  async criarPontoAcesso(estufaId, tipo, indiceAresta) {
+    const resp = await fetch(`/api/estufas/${estufaId}/pontos-acesso`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tipo, x, y }),
+      body: JSON.stringify({ tipo, indice_aresta: indiceAresta }),
     });
     return Api._tratarResposta(resp);
   },

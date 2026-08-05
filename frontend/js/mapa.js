@@ -1,6 +1,7 @@
 // mapa.js — renderização da imagem aérea e dos polígonos SVG de
 // estufas e áreas, além dos modos interativos de amostra de cor
-// (multi-ponto) e de desenho manual de uma nova estufa.
+// (multi-ponto), desenho manual de uma nova estufa e escolha de
+// aresta (entrada/saída).
 
 const Mapa = (() => {
   let elVazio;
@@ -47,10 +48,10 @@ const Mapa = (() => {
     return `${estufa.numero} · ${estufa.nome}`;
   }
 
-  function _linhasRotuloArea(area) {
-    const dimensoes = `${area.canteiros || "-"}x${area.vaos || "-"}x${area.postinhos || "-"}`;
-    const variedade = area.variedade_nome || "Sem variedade";
-    return [`A${area.ordem}`, dimensoes, variedade];
+  // Retorna os dois pontos (início/fim) da aresta `indice` do polígono
+  // — o segmento entre esse vértice e o próximo, com wrap-around.
+  function _pontosDaAresta(poligono, indice) {
+    return [poligono[indice], poligono[(indice + 1) % poligono.length]];
   }
 
   function _desenharArea(ns, grupo, area, estufa) {
@@ -67,26 +68,6 @@ const Mapa = (() => {
       aoSelecionarAreaCb(area, estufa);
     });
     grupo.appendChild(poligono);
-
-    const centro = _centro(area.poligono);
-    const rotulo = document.createElementNS(ns, "text");
-    rotulo.setAttribute("x", centro.x);
-    rotulo.setAttribute("y", centro.y);
-    rotulo.setAttribute("text-anchor", "middle");
-    rotulo.setAttribute("class", "rotulo-area");
-    rotulo.dataset.areaId = area.id;
-
-    const linhas = _linhasRotuloArea(area);
-    linhas.forEach((linha, indice) => {
-      const tspan = document.createElementNS(ns, "tspan");
-      tspan.setAttribute("x", centro.x);
-      tspan.setAttribute("dy", indice === 0 ? "-1em" : "1.1em");
-      tspan.setAttribute("class", indice === 0 ? "rotulo-area__titulo" : "");
-      tspan.textContent = linha;
-      rotulo.appendChild(tspan);
-    });
-
-    grupo.appendChild(rotulo);
   }
 
   function _desenharEstufa(estufa) {
@@ -110,7 +91,10 @@ const Mapa = (() => {
       }
     }
 
-    if (!temAreas && estufa.poligono.length > 0) {
+    // O título da estufa fica sempre visível dentro dela (com ou sem
+    // áreas geradas) — como as áreas não têm mais texto próprio, não
+    // há mais risco de sobreposição de informação.
+    if (estufa.poligono.length > 0) {
       const centro = _centro(estufa.poligono);
       const rotulo = document.createElementNS(ns, "text");
       rotulo.setAttribute("x", centro.x);
@@ -129,19 +113,23 @@ const Mapa = (() => {
     elSvg.appendChild(grupo);
   }
 
-  function _desenharMarcadorAcesso(ponto) {
+  function _desenharArestaAcesso(ponto, estufa) {
+    if (!estufa) return;
     const ns = "http://www.w3.org/2000/svg";
-    const marcador = document.createElementNS(ns, "circle");
-    marcador.setAttribute("cx", ponto.x);
-    marcador.setAttribute("cy", ponto.y);
-    marcador.setAttribute("r", 7);
-    marcador.setAttribute("class", `marcador-acesso marcador-acesso--${ponto.tipo}`);
-    marcador.dataset.acessoId = ponto.id;
-    marcador.addEventListener("click", (evento) => {
+    const [p1, p2] = _pontosDaAresta(estufa.poligono, ponto.indice_aresta);
+
+    const linha = document.createElementNS(ns, "line");
+    linha.setAttribute("x1", p1.x);
+    linha.setAttribute("y1", p1.y);
+    linha.setAttribute("x2", p2.x);
+    linha.setAttribute("y2", p2.y);
+    linha.setAttribute("class", `aresta-acesso aresta-acesso--${ponto.tipo}`);
+    linha.dataset.acessoId = ponto.id;
+    linha.addEventListener("click", (evento) => {
       evento.stopPropagation();
       aoClicarAcessoCb(ponto);
     });
-    elSvg.appendChild(marcador);
+    elSvg.appendChild(linha);
   }
 
   function carregar({ imagemUrl, estufas, pontosAcesso }) {
@@ -156,21 +144,31 @@ const Mapa = (() => {
     };
 
     _limparSvg();
+    const estufasPorId = new Map();
     for (const estufa of estufas || []) {
       _desenharEstufa(estufa);
+      estufasPorId.set(estufa.id, estufa);
     }
     for (const ponto of pontosAcesso || []) {
-      _desenharMarcadorAcesso(ponto);
+      _desenharArestaAcesso(ponto, estufasPorId.get(ponto.estufa_id));
     }
   }
 
-  function adicionarMarcadorAcesso(ponto) {
-    _desenharMarcadorAcesso(ponto);
+  function adicionarArestaAcesso(ponto, estufa) {
+    _desenharArestaAcesso(ponto, estufa);
   }
 
-  function removerMarcadorAcesso(acessoId) {
-    const marcador = elSvg.querySelector(`circle.marcador-acesso[data-acesso-id="${acessoId}"]`);
-    if (marcador) marcador.remove();
+  function removerArestaAcesso(acessoId) {
+    const linha = elSvg.querySelector(`line.aresta-acesso[data-acesso-id="${acessoId}"]`);
+    if (linha) linha.remove();
+  }
+
+  // Passe null/undefined pra limpar a seleção (ex.: ao apertar Escape
+  // ou selecionar outra coisa no mapa).
+  function selecionarArestaAcesso(acessoId) {
+    elSvg.querySelectorAll(".aresta-acesso").forEach((l) => {
+      l.classList.toggle("selecionada", acessoId != null && Number(l.dataset.acessoId) === Number(acessoId));
+    });
   }
 
   function marcarEstufaSelecionada(estufaId) {
@@ -203,16 +201,6 @@ const Mapa = (() => {
     if (poligono) {
       poligono.style.fill = cor || "";
     }
-  }
-
-  function atualizarRotuloArea(areaId, area) {
-    const rotulo = elSvg.querySelector(`text.rotulo-area[data-area-id="${areaId}"]`);
-    if (!rotulo) return;
-    const tspans = rotulo.querySelectorAll("tspan");
-    const linhas = _linhasRotuloArea(area);
-    tspans.forEach((tspan, indice) => {
-      if (linhas[indice] !== undefined) tspan.textContent = linhas[indice];
-    });
   }
 
   function _pontoDoEvento(evento) {
@@ -306,19 +294,35 @@ const Mapa = (() => {
     };
   }
 
-  // Modo de ponto único: um clique no mapa posiciona um marcador de
-  // entrada/saída e o modo se encerra sozinho (chame o finalizar
-  // retornado se o usuário cancelar antes de clicar).
-  function iniciarModoPonto(aoClicar) {
-    const overlay = _criarOverlayClicavel();
+  // Modo de escolha de aresta: destaca todas as arestas de todas as
+  // estufas como clicáveis; ao clicar numa, dispara aoEscolherAresta
+  // com (estufaId, indiceAresta) e o modo se encerra sozinho (chame o
+  // finalizar retornado se o usuário cancelar antes de clicar).
+  function iniciarModoAresta(estufas, aoEscolherAresta) {
+    const ns = "http://www.w3.org/2000/svg";
+    const linhas = [];
 
-    overlay.addEventListener("click", (evento) => {
-      const { x, y } = _pontoDoEvento(evento);
-      aoClicar(x, y);
-    });
+    for (const estufa of estufas || []) {
+      const poligono = estufa.poligono || [];
+      for (let indice = 0; indice < poligono.length; indice++) {
+        const [p1, p2] = _pontosDaAresta(poligono, indice);
+        const linha = document.createElementNS(ns, "line");
+        linha.setAttribute("x1", p1.x);
+        linha.setAttribute("y1", p1.y);
+        linha.setAttribute("x2", p2.x);
+        linha.setAttribute("y2", p2.y);
+        linha.setAttribute("class", "aresta-selecionavel");
+        linha.addEventListener("click", (evento) => {
+          evento.stopPropagation();
+          aoEscolherAresta(estufa.id, indice);
+        });
+        elSvg.appendChild(linha);
+        linhas.push(linha);
+      }
+    }
 
     return function finalizar() {
-      if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+      linhas.forEach((l) => l.parentNode && l.parentNode.removeChild(l));
     };
   }
 
@@ -330,11 +334,11 @@ const Mapa = (() => {
     marcarAreaSelecionada,
     atualizarRotulo,
     atualizarCorArea,
-    atualizarRotuloArea,
     iniciarModoAmostra,
     iniciarModoDesenho,
-    iniciarModoPonto,
-    adicionarMarcadorAcesso,
-    removerMarcadorAcesso,
+    iniciarModoAresta,
+    adicionarArestaAcesso,
+    removerArestaAcesso,
+    selecionarArestaAcesso,
   };
 })();
