@@ -283,8 +283,15 @@ def _desenhar_rotulos_vetoriais(
         largura_caixa = max(pdf.get_string_width(linha) for linha in linhas) + 4
         y_atual = cy - (len(linhas) * altura_linha) / 2
 
+        # `angulo_graus` é calculado em espaço de pixels da imagem (eixo Y
+        # crescendo pra baixo, igual ao SVG do navegador). `pdf.rotation()`
+        # do fpdf2 usa o sentido contrário — testado e confirmado gerando
+        # um PDF real, extraindo a matriz de rotação do próprio conteúdo
+        # do PDF e comparando com o ângulo verdadeiro da aresta (medido
+        # nos pixels da imagem via PCA): sem o sinal invertido aqui, o
+        # texto saía espelhado (mesma inclinação, direção oposta).
         angulo = rotulo.get("angulo_graus", 0)
-        with pdf.rotation(angulo, cx, cy) if angulo else contextlib.nullcontext():
+        with pdf.rotation(-angulo, cx, cy) if angulo else contextlib.nullcontext():
             for linha in linhas:
                 pdf.set_xy(cx - largura_caixa / 2, y_atual)
                 pdf.cell(largura_caixa, altura_linha, linha, align="C")
