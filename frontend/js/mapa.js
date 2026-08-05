@@ -45,7 +45,7 @@ const Mapa = (() => {
   }
 
   function _textoRotulo(estufa) {
-    return `${estufa.numero} · ${estufa.nome}`;
+    return estufa.nome;
   }
 
   // Retorna os dois pontos (início/fim) da aresta `indice` do polígono
@@ -219,10 +219,10 @@ const Mapa = (() => {
     });
   }
 
-  function atualizarRotulo(estufaId, numero, nome) {
+  function atualizarRotulo(estufaId, nome) {
     const rotulo = elSvg.querySelector(`text[data-estufa-id="${estufaId}"]`);
     if (rotulo) {
-      rotulo.textContent = _textoRotulo({ numero, nome });
+      rotulo.textContent = _textoRotulo({ nome });
     }
   }
 

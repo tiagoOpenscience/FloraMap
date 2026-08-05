@@ -126,7 +126,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       aoVoltarGeral: mostrarVisaoGeral,
       aoAtualizar: async (estufaId, campos) => {
         const atualizada = await Api.atualizarEstufa(estufaId, campos);
-        Mapa.atualizarRotulo(estufaId, atualizada.numero, atualizada.nome);
+        Mapa.atualizarRotulo(estufaId, atualizada.nome);
         Object.assign(estufa, atualizada);
         return atualizada;
       },

@@ -267,7 +267,6 @@ def _desenhar_rotulos_vetoriais(
     `frontend/css/style.css`).
     """
     largura_linha_original = pdf.line_width
-    pdf.set_draw_color(255, 255, 255)
     pdf.text_mode = "FILL_STROKE"
 
     for rotulo in rotulos:
@@ -277,6 +276,7 @@ def _desenhar_rotulos_vetoriais(
         pdf.set_font("Helvetica", "B", tamanho_pt)
         pdf.set_line_width(tamanho_pt * 0.35276 * 0.18)  # contorno proporcional ao tamanho da fonte
         pdf.set_text_color(*rotulo.get("cor_rgb", (25, 35, 20)))
+        pdf.set_draw_color(*rotulo.get("cor_contorno_rgb", (255, 255, 255)))
 
         linhas = [_texto_seguro(linha) for linha in rotulo["linhas"]]
         altura_linha = tamanho_pt * 0.4
@@ -314,14 +314,14 @@ def _gerar_imagem_mapa(
     draw_overlay = ImageDraw.Draw(overlay)
 
     escala = max(1, base.width // 800)
-    espessura_estufa = max(2, escala)
+    espessura_estufa = max(5, 4 * escala)
     espessura_area = max(1, escala)
     cor_neutra = (207, 214, 199, 150)
 
     for estufa in estufas:
         pontos_estufa = [(p["x"] * fator_render, p["y"] * fator_render) for p in estufa["poligono"]]
         if len(pontos_estufa) >= 2:
-            draw_overlay.polygon(pontos_estufa, outline=(47, 111, 78, 255), width=espessura_estufa)
+            draw_overlay.polygon(pontos_estufa, outline=(0, 0, 0, 255), width=espessura_estufa)
 
         for area in estufa.get("areas") or []:
             pontos_area = [(p["x"] * fator_render, p["y"] * fator_render) for p in area["poligono"]]
@@ -375,6 +375,7 @@ def _gerar_imagem_mapa(
                 "tamanho_fonte_px": tamanho_fonte_acesso,
                 "angulo_graus": angulo,
                 "cor_rgb": COR_ENTRADA_TEXTO if entrada else COR_SAIDA_TEXTO,
+                "cor_contorno_rgb": (0, 0, 0),
             }
         )
 
@@ -389,7 +390,7 @@ def _gerar_imagem_mapa(
         rotulos.append(
             {
                 "centro_frac": (centro_estufa[0] / largura_final, centro_estufa[1] / altura_final),
-                "linhas": [f"{estufa['numero']} · {estufa['nome']}"],
+                "linhas": [estufa["nome"]],
                 "tamanho_fonte_px": tamanho_fonte_estufa,
             }
         )
