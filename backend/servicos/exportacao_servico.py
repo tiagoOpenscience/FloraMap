@@ -9,8 +9,10 @@ Geral.
 
 from __future__ import annotations
 
+import contextlib
 import csv
 import io
+import math
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -28,6 +30,8 @@ from backend.servicos import (
 
 COR_ENTRADA = (47, 111, 78)  # mesmo verde de --cor-primaria
 COR_SAIDA = (179, 69, 58)  # mesmo vermelho de --cor-perigo
+COR_ENTRADA_TEXTO = (35, 79, 56)  # mesmo verde de --cor-primaria-escura (contraste do rótulo)
+COR_SAIDA_TEXTO = (122, 46, 38)  # variante escura de --cor-perigo (contraste do rótulo)
 
 LARGURA_MAXIMA_IMAGEM_PDF = 1800  # px — evita PDFs enormes com fotos muito grandes
 
@@ -264,7 +268,6 @@ def _desenhar_rotulos_vetoriais(
     """
     largura_linha_original = pdf.line_width
     pdf.set_draw_color(255, 255, 255)
-    pdf.set_text_color(25, 35, 20)
     pdf.text_mode = "FILL_STROKE"
 
     for rotulo in rotulos:
@@ -273,16 +276,19 @@ def _desenhar_rotulos_vetoriais(
         tamanho_pt = max(6.0, rotulo["tamanho_fonte_px"] * px_para_pt)
         pdf.set_font("Helvetica", "B", tamanho_pt)
         pdf.set_line_width(tamanho_pt * 0.35276 * 0.18)  # contorno proporcional ao tamanho da fonte
+        pdf.set_text_color(*rotulo.get("cor_rgb", (25, 35, 20)))
 
         linhas = [_texto_seguro(linha) for linha in rotulo["linhas"]]
         altura_linha = tamanho_pt * 0.4
         largura_caixa = max(pdf.get_string_width(linha) for linha in linhas) + 4
         y_atual = cy - (len(linhas) * altura_linha) / 2
 
-        for linha in linhas:
-            pdf.set_xy(cx - largura_caixa / 2, y_atual)
-            pdf.cell(largura_caixa, altura_linha, linha, align="C")
-            y_atual += altura_linha
+        angulo = rotulo.get("angulo_graus", 0)
+        with pdf.rotation(angulo, cx, cy) if angulo else contextlib.nullcontext():
+            for linha in linhas:
+                pdf.set_xy(cx - largura_caixa / 2, y_atual)
+                pdf.cell(largura_caixa, altura_linha, linha, align="C")
+                y_atual += altura_linha
 
     pdf.text_mode = "FILL"
     pdf.set_text_color(0, 0, 0)
@@ -328,8 +334,18 @@ def _gerar_imagem_mapa(
                 cor = cor_neutra
             draw_overlay.polygon(pontos_area, fill=cor, outline=(255, 255, 255, 255), width=espessura_area)
 
+    # Os rótulos não são desenhados na imagem — só a posição/texto/tamanho
+    # são calculados aqui; o desenho em si acontece depois como texto
+    # vetorial do PDF (`_desenhar_rotulos_vetoriais`), com contorno branco
+    # ao redor das letras para legibilidade (em vez de uma caixa de
+    # fundo), continuando nítido em qualquer nível de zoom.
+    tamanho_fonte_estufa = max(14, 16 * escala)
+    largura_final = base.width
+    altura_final = base.height
+    rotulos: list[dict[str, Any]] = []
+
     estufas_por_id = {estufa["id"]: estufa for estufa in estufas}
-    espessura_acesso = max(5, 4 * escala)
+    espessura_acesso = max(8, 6 * escala)
     for ponto in pontos_acesso or []:
         estufa = estufas_por_id.get(ponto["estufa_id"])
         if estufa is None:
@@ -337,28 +353,32 @@ def _gerar_imagem_mapa(
         poligono = estufa["poligono"]
         p1 = poligono[ponto["indice_aresta"]]
         p2 = poligono[(ponto["indice_aresta"] + 1) % len(poligono)]
-        cor = (*(COR_ENTRADA if ponto["tipo"] == "entrada" else COR_SAIDA), 255)
-        draw_overlay.line(
-            [
-                (p1["x"] * fator_render, p1["y"] * fator_render),
-                (p2["x"] * fator_render, p2["y"] * fator_render),
-            ],
-            fill=cor,
-            width=espessura_acesso,
+        p1x, p1y = p1["x"] * fator_render, p1["y"] * fator_render
+        p2x, p2y = p2["x"] * fator_render, p2["y"] * fator_render
+
+        entrada = ponto["tipo"] == "entrada"
+        cor_linha = (*(COR_ENTRADA if entrada else COR_SAIDA), 255)
+        draw_overlay.line([(p1x, p1y), (p2x, p2y)], fill=cor_linha, width=espessura_acesso)
+
+        # Rótulo "Entrada"/"Saída" escrito ao longo da própria aresta,
+        # igual ao mapa interativo — tamanho proporcional ao comprimento
+        # dela, girado pra acompanhar a inclinação da borda.
+        comprimento = math.hypot(p2x - p1x, p2y - p1y)
+        tamanho_fonte_acesso = max(9 * escala, min(16 * escala, comprimento * 0.14))
+        angulo = math.degrees(math.atan2(p2y - p1y, p2x - p1x))
+        if angulo > 90 or angulo < -90:
+            angulo += 180
+        rotulos.append(
+            {
+                "centro_frac": ((p1x + p2x) / 2 / largura_final, (p1y + p2y) / 2 / altura_final),
+                "linhas": ["Entrada" if entrada else "Saída"],
+                "tamanho_fonte_px": tamanho_fonte_acesso,
+                "angulo_graus": angulo,
+                "cor_rgb": COR_ENTRADA_TEXTO if entrada else COR_SAIDA_TEXTO,
+            }
         )
 
     composta = Image.alpha_composite(base, overlay).convert("RGB")
-
-    # Os rótulos não são desenhados na imagem — só a posição/texto/tamanho
-    # são calculados aqui; o desenho em si acontece depois como texto
-    # vetorial do PDF (`_desenhar_rotulos_vetoriais`), com contorno branco
-    # ao redor das letras para legibilidade (em vez de uma caixa de
-    # fundo), continuando nítido em qualquer nível de zoom.
-    tamanho_fonte_estufa = max(14, 16 * escala)
-
-    rotulos: list[dict[str, Any]] = []
-    largura_final = base.width
-    altura_final = base.height
 
     for estufa in estufas:
         # O título da estufa fica sempre centralizado no polígono, igual

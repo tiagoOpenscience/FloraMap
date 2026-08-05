@@ -105,8 +105,8 @@ Se você excluiu uma estufa/área, dividiu uma estufa ou rodou a detecção por 
 
 ### 3.9 Marcar a entrada e a saída de uma estufa
 
-1. Clique em **Adicionar entrada** e depois clique numa das bordas da estufa — aquela borda fica mais grossa e **verde**, marcando a entrada.
-2. Clique em **Adicionar saída** e depois clique noutra borda — ela fica mais grossa e **vermelha**, marcando a saída.
+1. Clique em **Adicionar entrada** e depois clique numa das bordas da estufa — aquela borda fica bem mais grossa e **verde**, com a palavra "Entrada" escrita ao longo dela, marcando a entrada.
+2. Clique em **Adicionar saída** e depois clique noutra borda — ela fica bem mais grossa e **vermelha**, com a palavra "Saída" escrita ao longo dela, marcando a saída.
 3. A legenda no canto inferior esquerdo do mapa sempre mostra o que cada cor significa.
 4. Para remover uma marcação colocada errado: clique na borda marcada (ela fica com um contorno tracejado, indicando que foi selecionada) e pressione a tecla **Delete** (ou **Backspace**) do teclado.
 

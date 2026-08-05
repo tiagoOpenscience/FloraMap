@@ -113,10 +113,30 @@ const Mapa = (() => {
     elSvg.appendChild(grupo);
   }
 
+  const TEXTO_TIPO_ACESSO = { entrada: "Entrada", saida: "Saída" };
+
+  // Ângulo (graus) da aresta p1→p2, corrigido pra nunca ficar de
+  // cabeça para baixo (texto sempre legível da esquerda pra direita).
+  function _anguloLegivel(p1, p2) {
+    let angulo = Math.atan2(p2.y - p1.y, p2.x - p1.x) * (180 / Math.PI);
+    if (angulo > 90 || angulo < -90) angulo += 180;
+    return angulo;
+  }
+
   function _desenharArestaAcesso(ponto, estufa) {
     if (!estufa) return;
     const ns = "http://www.w3.org/2000/svg";
     const [p1, p2] = _pontosDaAresta(estufa.poligono, ponto.indice_aresta);
+    const comprimento = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+    const meio = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+
+    const grupo = document.createElementNS(ns, "g");
+    grupo.setAttribute("class", "grupo-aresta-acesso");
+    grupo.dataset.acessoId = ponto.id;
+    grupo.addEventListener("click", (evento) => {
+      evento.stopPropagation();
+      aoClicarAcessoCb(ponto);
+    });
 
     const linha = document.createElementNS(ns, "line");
     linha.setAttribute("x1", p1.x);
@@ -124,12 +144,22 @@ const Mapa = (() => {
     linha.setAttribute("x2", p2.x);
     linha.setAttribute("y2", p2.y);
     linha.setAttribute("class", `aresta-acesso aresta-acesso--${ponto.tipo}`);
-    linha.dataset.acessoId = ponto.id;
-    linha.addEventListener("click", (evento) => {
-      evento.stopPropagation();
-      aoClicarAcessoCb(ponto);
-    });
-    elSvg.appendChild(linha);
+    grupo.appendChild(linha);
+
+    // Rótulo "Entrada"/"Saída" escrito ao longo da própria aresta,
+    // como o título da estufa (mesmo estilo, porém menor), com
+    // tamanho proporcional ao comprimento da aresta no mapa.
+    const tamanhoFonte = Math.max(8, Math.min(15, comprimento * 0.14));
+    const rotulo = document.createElementNS(ns, "text");
+    rotulo.setAttribute("x", meio.x);
+    rotulo.setAttribute("y", meio.y);
+    rotulo.setAttribute("transform", `rotate(${_anguloLegivel(p1, p2)}, ${meio.x}, ${meio.y})`);
+    rotulo.setAttribute("font-size", tamanhoFonte);
+    rotulo.setAttribute("class", `rotulo-aresta-acesso rotulo-aresta-acesso--${ponto.tipo}`);
+    rotulo.textContent = TEXTO_TIPO_ACESSO[ponto.tipo] || "";
+    grupo.appendChild(rotulo);
+
+    elSvg.appendChild(grupo);
   }
 
   function carregar({ imagemUrl, estufas, pontosAcesso }) {
@@ -159,15 +189,15 @@ const Mapa = (() => {
   }
 
   function removerArestaAcesso(acessoId) {
-    const linha = elSvg.querySelector(`line.aresta-acesso[data-acesso-id="${acessoId}"]`);
-    if (linha) linha.remove();
+    const grupo = elSvg.querySelector(`g.grupo-aresta-acesso[data-acesso-id="${acessoId}"]`);
+    if (grupo) grupo.remove();
   }
 
   // Passe null/undefined pra limpar a seleção (ex.: ao apertar Escape
   // ou selecionar outra coisa no mapa).
   function selecionarArestaAcesso(acessoId) {
-    elSvg.querySelectorAll(".aresta-acesso").forEach((l) => {
-      l.classList.toggle("selecionada", acessoId != null && Number(l.dataset.acessoId) === Number(acessoId));
+    elSvg.querySelectorAll(".grupo-aresta-acesso").forEach((g) => {
+      g.classList.toggle("selecionada", acessoId != null && Number(g.dataset.acessoId) === Number(acessoId));
     });
   }
 

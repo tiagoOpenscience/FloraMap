@@ -359,10 +359,13 @@ label:first-child {
   stroke: rgba(47, 111, 78, 0.6);
 }
 
-.aresta-acesso {
-  stroke-width: 6;
-  stroke-linecap: round;
+.grupo-aresta-acesso {
   cursor: pointer;
+}
+
+.aresta-acesso {
+  stroke-width: 9;
+  stroke-linecap: round;
 }
 
 .aresta-acesso--entrada {
@@ -373,9 +376,28 @@ label:first-child {
   stroke: var(--cor-perigo);
 }
 
-.aresta-acesso.selecionada {
-  stroke-width: 9;
-  stroke-dasharray: 3 4;
+.grupo-aresta-acesso.selecionada .aresta-acesso {
+  stroke-width: 12;
+  stroke-dasharray: 3 5;
+}
+
+.rotulo-aresta-acesso {
+  font-weight: 700;
+  text-anchor: middle;
+  dominant-baseline: middle;
+  pointer-events: none;
+  paint-order: stroke;
+  stroke: #ffffff;
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+
+.rotulo-aresta-acesso--entrada {
+  fill: var(--cor-primaria-escura);
+}
+
+.rotulo-aresta-acesso--saida {
+  fill: #7a2e26;
 }
 
 .botao-acesso {
